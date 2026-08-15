@@ -5,12 +5,12 @@ packages:
 # §12.3: налаштування дозволу на build-скрипти живе саме тут (pnpm 11 переніс його
 # з поля `pnpm` у package.json та з `onlyBuiltDependencies`). Значення проставлені
 # руками — `pnpm approve-builds` лишає плейсхолдери "set this to true or false".
-# Записи для prisma та @prisma/engines внесені наперед за §12.3: Prisma підключається
-# наступним етапом, і конфігурація має бути готова до неї вже зараз.
+# esbuild потрапляє сюди через `tsx`, яким виконується prisma/seed.ts.
 allowBuilds:
   unrs-resolver: true
   '@prisma/engines': true
   prisma: true
+  esbuild: true
 
 minimumReleaseAgeExclude:
   - '@nestjs/common@11.2.1'

@@ -9,6 +9,11 @@ coverage/
 # §12.3: без цього інкрементальна збірка «бачить» неіснуючий dist
 *.tsbuildinfo
 
+# Prisma Client — артефакт `prisma generate`, а не вихідний код. Джерело правди —
+# prisma/schema.prisma; тримати згенероване в git означає мерджити конфлікти в
+# файлах, які ніхто не редагує.
+apps/api/src/generated/
+
 .env
 .env.local
 .env.*.local

@@ -1,0 +1,451 @@
+// Модель даних §4 специфікації.
+//
+// Схема заводиться ВСЯ одразу (§14, етап 1) — включно з `Loan` і сповіщеннями,
+// код під які пишеться на етапах 2–3. Ключове, що не спрощується:
+// Work → Translation → Edition → Copy, і позичається завжди `Copy`.
+
+// §4.1 писався під Prisma 6 і прямо просить звірити блок із фактичним синтаксисом
+// встановленої версії. Тут Prisma 7.9, і вона розійшлася з текстом ТЗ у трьох місцях:
+//
+//   1. `prisma-client-js` deprecated → `prisma-client`, і `output` тепер обов'язковий.
+//      Генерований клієнт лежить у `src/`, тож його компілює звичайний `tsc`.
+//   2. `binaryTargets` більше не існує: Rust-движок прибрано, клієнт — TypeScript
+//      плюс WASM query compiler. Вимога §4.1 «ARM для Hetzner CAX» від цього не
+//      зникає — вона виконується сама собою, бо нативних движків більше немає й
+//      архітектура сервера ролі не грає.
+//   3. `url` / `directUrl` / `extensions` пішли з `datasource`: URL живе в
+//      `prisma.config.ts`, а розширення створюються сирим SQL у першій міграції
+//      (§4.9 і так цього вимагає — Prisma не гарантує порядок відносно індексів).
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// §4.2 Користувачі
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  passwordHash  String
+  displayName   String
+  avatarUrl     String?
+  bio           String?
+  createdAt     DateTime @default(now())
+
+  // Видимість
+  libraryVisibility Visibility @default(FRIENDS)
+  showHolderNames   Boolean    @default(true)
+
+  // Канали сповіщень
+  telegramChatId String? @unique
+
+  copiesOwned        Copy[]                   @relation("CopyOwner")
+  copiesHeld         Copy[]                   @relation("CopyHolder")
+  loansAsBorrower    Loan[]                   @relation("LoanBorrower")
+  loansAsOwner       Loan[]                   @relation("LoanOwner")
+  reviews            Review[]
+  translationRatings TranslationRating[]
+  friendshipsA       Friendship[]             @relation("FriendA")
+  friendshipsB       Friendship[]             @relation("FriendB")
+  wishlist           WishlistItem[]
+  notifications      Notification[]
+  notificationPrefs  NotificationPreference[]
+
+  @@index([displayName])
+}
+
+enum Visibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+// ---------------------------------------------------------------------------
+// §4.3 Дружба
+// ---------------------------------------------------------------------------
+
+/// Один рядок на пару. Інваріант §5.3.5: `userAId < userBId` лексикографічно —
+/// це прибирає OR-умови з кожної перевірки «чи ми друзі».
+model Friendship {
+  id      String           @id @default(cuid())
+  userAId String
+  userBId String
+  status  FriendshipStatus @default(PENDING)
+
+  /// §4.3: НЕ виводиться з A/B. Порядок задає сортування id, а не те, хто ініціював.
+  requestedById String
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  userA User @relation("FriendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("FriendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId, status])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+// ---------------------------------------------------------------------------
+// §4.4 Каталог
+// ---------------------------------------------------------------------------
+
+model Author {
+  id        String  @id @default(cuid())
+  name      String
+  nameLatin String?
+
+  works WorkAuthor[]
+
+  @@index([name])
+  // §4.9: GIN-індекс для fuzzy-пошуку (§6.3, крок 2). `pg_trgm` створюється сирим
+  // SQL на початку першої міграції — інакше на чистій базі CREATE INDEX упаде.
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "author_name_trgm_idx", type: Gin)
+}
+
+model WorkAuthor {
+  workId   String
+  authorId String
+  role     AuthorRole @default(AUTHOR)
+
+  work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([workId, authorId, role])
+}
+
+enum AuthorRole {
+  AUTHOR
+  CO_AUTHOR
+  EDITOR
+  ILLUSTRATOR
+}
+
+model Work {
+  id           String   @id @default(cuid())
+  title        String
+  /// lower + unaccent, для пошуку
+  titleNorm    String
+  /// ISO 639-1
+  origLang     String
+  firstPubYear Int?
+  description  String?
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  /// §6.3, мердж дублікатів: старий запис не видаляється, інакше вмирають зовнішні посилання.
+  mergedIntoId String?
+  mergedInto   Work?   @relation("WorkMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom   Work[]  @relation("WorkMerge")
+
+  authors      WorkAuthor[]
+  editions     Edition[]
+  translations Translation[]
+  reviews      Review[]
+  wishlistedBy WishlistItem[]
+
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
+  @@index([titleNorm])
+  @@index([mergedIntoId])
+  @@index([titleNorm(ops: raw("gin_trgm_ops"))], map: "work_title_trgm_idx", type: Gin)
+}
+
+model Translation {
+  id         String @id @default(cuid())
+  workId     String
+  translator String
+  lang       String
+  /// §10.3: з якої мови перекладали — найсильніший наявний сигнал при cold start.
+  sourceLang String
+  year       Int?
+
+  isAbridged Boolean @default(false)
+  hasNotes   Boolean @default(false)
+  notes      String?
+
+  work     Work                @relation(fields: [workId], references: [id], onDelete: Cascade)
+  editions Edition[]
+  ratings  TranslationRating[]
+
+  /// §10.2: байєсівський ранг. Перераховується разом зі зміною TranslationRating.
+  score       Float @default(0)
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
+  @@index([workId, lang])
+}
+
+model Edition {
+  id            String        @id @default(cuid())
+  workId        String
+  /// null = мовою оригіналу
+  translationId String?
+  publisher     String?
+  year          Int?
+  isbn13        String?       @unique
+  pageCount     Int?
+  coverUrl      String?
+  format        EditionFormat @default(PAPERBACK)
+  createdById   String
+  createdAt     DateTime      @default(now())
+
+  work        Work         @relation(fields: [workId], references: [id], onDelete: Cascade)
+  translation Translation? @relation(fields: [translationId], references: [id])
+  copies      Copy[]
+
+  @@index([workId])
+  @@index([translationId])
+}
+
+enum EditionFormat {
+  HARDCOVER
+  PAPERBACK
+  POCKET
+}
+
+// ---------------------------------------------------------------------------
+// §4.5 Примірники
+// ---------------------------------------------------------------------------
+
+/// §3: кількість примірників — це COUNT рядків `Copy`, а не поле `quantity`.
+/// Поле ламається щойно один примірник позичений, а другий удома.
+model Copy {
+  id        String @id @default(cuid())
+  editionId String
+  ownerId   String
+
+  /// Хто фізично тримає книгу зараз. Дорівнює ownerId, коли книга вдома (інваріант §5.3.2).
+  currentHolderId String
+
+  status CopyStatus @default(AVAILABLE)
+  /// §4.5: ортогонально до status. Прихована книга може бути одночасно позиченою.
+  visibility Visibility @default(FRIENDS)
+  condition  Condition  @default(GOOD)
+  note       String?
+  acquiredAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  edition       Edition @relation(fields: [editionId], references: [id])
+  owner         User    @relation("CopyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  currentHolder User    @relation("CopyHolder", fields: [currentHolderId], references: [id])
+  loans         Loan[]
+
+  @@index([ownerId, status])
+  @@index([currentHolderId])
+  @@index([editionId])
+}
+
+enum CopyStatus {
+  /// вдома, вільна
+  AVAILABLE
+  /// запит підтверджено, з рук у руки ще не передано
+  RESERVED
+  /// фізично в позичальника
+  LENT_OUT
+  /// власник тимчасово не дає
+  UNAVAILABLE
+}
+
+enum Condition {
+  NEW
+  GOOD
+  WORN
+  DAMAGED
+}
+
+// ---------------------------------------------------------------------------
+// §4.6 Позичання
+// ---------------------------------------------------------------------------
+
+/// Ця таблиця одночасно є історією (§6.6). Окремої `CopyHistory` немає.
+model Loan {
+  id     String @id @default(cuid())
+  copyId String
+  /// денормалізовано з Copy на момент створення
+  ownerId    String
+  borrowerId String
+  status     LoanStatus @default(REQUESTED)
+
+  message      String?
+  responseNote String?
+
+  requestedAt DateTime  @default(now())
+  respondedAt DateTime?
+  handedAt    DateTime?
+  dueAt       DateTime?
+  returnedAt  DateTime?
+
+  copy     Copy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+  owner    User @relation("LoanOwner", fields: [ownerId], references: [id])
+  borrower User @relation("LoanBorrower", fields: [borrowerId], references: [id])
+
+  @@index([copyId, status])
+  @@index([borrowerId, status])
+  @@index([ownerId, status])
+}
+
+/// §5.2: `OVERDUE` тут немає навмисно. Прострочення виводиться як
+/// `status = HANDED_OVER AND dueAt < now()`; окремий статус завжди відставав би.
+enum LoanStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  HANDED_OVER
+  RETURNED
+  LOST
+}
+
+// ---------------------------------------------------------------------------
+// §4.7 Оцінки
+// ---------------------------------------------------------------------------
+
+/// §3: відгуки на твір, щоб не розповзалися по виданнях.
+model Review {
+  id     String @id @default(cuid())
+  workId String
+  userId String
+  /// 1..5
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workId, userId])
+  @@index([workId])
+}
+
+/// §3: оцінка якості перекладу висить на `Translation`, а НЕ на `Edition`. Один
+/// переклад виходить у кількох видавництвах — на виданні ранг розмазався б.
+model TranslationRating {
+  id            String @id @default(cuid())
+  translationId String
+  userId        String
+  /// 1..5 — якість перекладу, не твору
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+
+  translation Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([translationId, userId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  workId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workId])
+}
+
+// ---------------------------------------------------------------------------
+// §4.8 Сповіщення
+// ---------------------------------------------------------------------------
+
+/// §4.8: розділення Notification / NotificationDelivery не декоративне — одна подія
+/// йде в кілька каналів, і кожен має власний статус та лічильник спроб.
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  type   NotificationType
+  /// loanId, copyId, actorId тощо
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  @@index([userId, readAt])
+}
+
+/// §7.3: черга доставки — таблиця, не Redis/BullMQ. Воркер забирає рядки зі
+/// `status = PENDING AND nextAttemptAt <= now()`.
+model NotificationDelivery {
+  id             String         @id @default(cuid())
+  notificationId String
+  channel        Channel
+  status         DeliveryStatus @default(PENDING)
+  attempts       Int            @default(0)
+  nextAttemptAt  DateTime       @default(now())
+  sentAt         DateTime?
+  error          String?
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+}
+
+/// §7.6: матриця «тип події × канал».
+model NotificationPreference {
+  userId  String
+  type    NotificationType
+  channel Channel
+  enabled Boolean          @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type, channel])
+}
+
+/// §7.4: прив'язка Telegram через deep link із TTL 10 хвилин.
+model TelegramLinkToken {
+  token     String    @id
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  @@index([userId])
+}
+
+enum NotificationType {
+  LOAN_REQUESTED
+  LOAN_APPROVED
+  LOAN_REJECTED
+  LOAN_HANDED_OVER
+  LOAN_RETURNED
+  LOAN_DUE_SOON
+  LOAN_OVERDUE
+  FRIEND_REQUESTED
+  FRIEND_ACCEPTED
+}
+
+enum Channel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}

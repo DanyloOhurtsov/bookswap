@@ -17,5 +17,8 @@
     // у TS 6 outDir без явного rootDir дає помилку TS5011, а ts-jest компілює
     // файли поодинці, тож «спільною текою» стає тека конкретного тесту.
   },
-  "include": ["src/**/*", "test/**/*"]
+  // prisma/ і prisma.config.ts входять сюди, а не в tsconfig.build.json: вони не
+  // компілюються в dist (їх виконує tsx / Prisma CLI), але мають покриватися
+  // `tsc --noEmit` і type-aware правилами ESLint нарівно з рештою коду.
+  "include": ["src/**/*", "test/**/*", "prisma/**/*", "prisma.config.ts"]
 }

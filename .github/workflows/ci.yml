@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
 
+env:
+  # §12.2: у репозиторії немає `.env`, тож змінні задаються тут. Для `verify`
+  # значення фіктивні — до бази ця job не звертається, але `prisma generate`
+  # читає `prisma.config.ts`, а той вимагає DIRECT_DATABASE_URL.
+  DATABASE_URL: postgresql://bookswap:dev@localhost:5432/bookswap?schema=public
+  DIRECT_DATABASE_URL: postgresql://bookswap:dev@localhost:5432/bookswap?schema=public
+  TEST_DATABASE_URL: postgresql://bookswap:dev@localhost:5432/bookswap_test?schema=public
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -29,5 +37,51 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-      # PostgreSQL як service container свідомо не піднімається: на цьому етапі
-      # до бази ніхто не підключається, а build не звертається до API.
+  # Окрема job, бо потребує PostgreSQL. Заразом це перевірка критерію «чиста
+  # PostgreSQL приймає всі міграції з нуля»: сервісний контейнер щоразу порожній,
+  # тож розширення §4.9 мусять створитися раніше за GIN-індекси — інакше крок
+  # `migrate deploy` упаде саме тут, а не під час першого розгортання на сервері.
+  database:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Та сама версія, що в docker-compose.yml і на VPS. Не `latest`.
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bookswap
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: bookswap
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookswap -d bookswap"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Згенерувати Prisma Client
+        run: pnpm db:generate
+
+      - name: Міграції на чисту базу
+        run: pnpm db:deploy
+
+      - name: Seed двічі — перевірка повторюваності
+        run: |
+          pnpm db:seed
+          pnpm db:seed
+
+      - name: Тести constraint'ів і e2e
+        run: pnpm test:db

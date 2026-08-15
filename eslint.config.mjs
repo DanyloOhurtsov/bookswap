@@ -12,6 +12,9 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/coverage/**',
       '**/next-env.d.ts',
+      // Prisma Client. Згенеровані файли й самі несуть /* eslint-disable */, але
+      // тримати їх поза проходом дешевше: це десятки тисяч рядків на кожен запуск.
+      'apps/api/src/generated/**',
     ],
   },
 
@@ -30,7 +33,13 @@ export default tseslint.config(
   // §2 обґрунтовує TypeScript 6 саме тим, що на ньому працюють type-aware правила
   // ESLint. Вмикаємо їх там, де файли вкриті tsconfig'ами пакетів.
   {
-    files: ['apps/api/src/**/*.ts', 'apps/api/test/**/*.ts', 'packages/shared/src/**/*.ts'],
+    files: [
+      'apps/api/src/**/*.ts',
+      'apps/api/test/**/*.ts',
+      'apps/api/prisma/**/*.ts',
+      'apps/api/prisma.config.ts',
+      'packages/shared/src/**/*.ts',
+    ],
     extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {

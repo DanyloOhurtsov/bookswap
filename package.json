@@ -12,11 +12,18 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:db": "turbo run test:db",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
+    "db:generate": "turbo run generate",
+    "db:migrate": "pnpm --filter @bookswap/api db:migrate",
+    "db:migrate:create": "pnpm --filter @bookswap/api db:migrate:create",
+    "db:deploy": "pnpm --filter @bookswap/api db:deploy",
+    "db:seed": "pnpm --filter @bookswap/api db:seed",
+    "db:reset": "pnpm --filter @bookswap/api db:reset",
     "clean": "turbo run clean && rimraf node_modules"
   },
   "devDependencies": {

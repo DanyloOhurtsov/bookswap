@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { validateEnv } from './config/env.validation'
 import { HealthModule } from './health/health.module'
+import { PrismaModule } from './prisma/prisma.module'
 
 /**
  * §12.2: `.env` — один, у корені репозиторію. Шлях однаковий і для `src/`, і для
@@ -17,6 +18,7 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
       envFilePath: ROOT_ENV_PATH,
       validate: validateEnv,
     }),
+    PrismaModule,
     HealthModule,
   ],
 })
