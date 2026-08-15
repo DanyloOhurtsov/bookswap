@@ -1,0 +1,33 @@
+{
+  "name": "bookswap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Сервіс обміну фізичними книжками",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=22.11.0 <23"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "^3.9.6",
+    "rimraf": "^6.0.1",
+    "turbo": "^2.10.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}

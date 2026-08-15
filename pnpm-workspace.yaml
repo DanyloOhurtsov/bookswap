@@ -1,0 +1,26 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# §12.3: налаштування дозволу на build-скрипти живе саме тут (pnpm 11 переніс його
+# з поля `pnpm` у package.json та з `onlyBuiltDependencies`). Значення проставлені
+# руками — `pnpm approve-builds` лишає плейсхолдери "set this to true or false".
+# Записи для prisma та @prisma/engines внесені наперед за §12.3: Prisma підключається
+# наступним етапом, і конфігурація має бути готова до неї вже зараз.
+allowBuilds:
+  unrs-resolver: true
+  '@prisma/engines': true
+  prisma: true
+
+minimumReleaseAgeExclude:
+  - '@nestjs/common@11.2.1'
+  - '@nestjs/core@11.2.1'
+  - '@nestjs/platform-express@11.2.1'
+  - '@nestjs/testing@11.2.1'
+  - '@turbo/darwin-64@2.10.10'
+  - '@turbo/darwin-arm64@2.10.10'
+  - '@turbo/linux-64@2.10.10'
+  - '@turbo/linux-arm64@2.10.10'
+  - '@turbo/windows-64@2.10.10'
+  - '@turbo/windows-arm64@2.10.10'
+  - turbo@2.10.10

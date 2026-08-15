@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+.turbo/
+coverage/
+
+# §12.3: без цього інкрементальна збірка «бачить» неіснуючий dist
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Версія береться з поля packageManager у кореневому package.json.
+
+      - uses: actions/setup-node@v4
+        with:
+          # §2: runtime проєкту — Node 22 LTS. Версія читається з .nvmrc, щоб
+          # вимога жила в одному місці.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      # PostgreSQL як service container свідомо не піднімається: на цьому етапі
+      # до бази ніхто не підключається, а build не звертається до API.

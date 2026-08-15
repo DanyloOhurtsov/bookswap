@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    // NestJS будує DI на метаданих декораторів; class-validator (§11) читає
+    // design:type звідти ж.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // §12.3: після відсутнього baseUrl TS 6 не підхоплює @types автоматично —
+    // перелічуємо явно. `jest` тут, бо цей конфіг охоплює і test/.
+    "types": ["node", "jest"]
+
+    // Налаштування емісії (outDir, rootDir) навмисно лише в tsconfig.build.json:
+    // у TS 6 outDir без явного rootDir дає помилку TS5011, а ts-jest компілює
+    // файли поодинці, тож «спільною текою» стає тека конкретного тесту.
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

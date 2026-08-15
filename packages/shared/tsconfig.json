@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node", "jest"]
+
+    // Налаштування емісії (outDir, declaration, rootDir) навмисно живуть лише в
+    // tsconfig.build.json. У TS 6 заданий outDir без явного rootDir — це помилка
+    // TS5011, а ts-jest компілює файли поодинці, тож «спільною текою» щоразу
+    // виявляється тека конкретного тесту.
+  },
+  "include": ["src/**/*"]
+}

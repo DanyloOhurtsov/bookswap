@@ -1,0 +1,22 @@
+# §12.2: у Docker — тільки Postgres. Nest і Next запускаються нативно.
+# Версія образу зафіксована й збігається з тією, що поїде на VPS. Не `latest`.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bookswap
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: bookswap
+    ports: ['5432:5432']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Не зі специфікації: потрібен, щоб `docker compose up -d --wait` завершувався
+    # детерміновано, а не одразу після старту контейнера.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bookswap -d bookswap']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
