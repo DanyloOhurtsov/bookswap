@@ -3,8 +3,12 @@
   --fg: #16130f;
   --bg: #fbfaf8;
   --muted: #6b6459;
+  --line: #ddd6ca;
+  --field-bg: #ffffff;
   --ok: #1f6f43;
+  --warn: #8a6116;
   --error: #a02c2c;
+  --accent: #1f6f43;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -12,8 +16,12 @@
     --fg: #f2efe9;
     --bg: #16130f;
     --muted: #a49b8d;
+    --line: #3a342c;
+    --field-bg: #1e1a15;
     --ok: #6fd39b;
+    --warn: #e0b567;
     --error: #f08a8a;
+    --accent: #6fd39b;
   }
 }
 
@@ -39,6 +47,17 @@ body {
   padding: 4rem 1.5rem;
 }
 
+/* Форми читаються гірше на широкій колонці — рядок стає задовгим для ока. */
+.page--narrow {
+  max-width: 28rem;
+}
+
+@media (max-width: 30rem) {
+  .page {
+    padding: 2rem 1rem;
+  }
+}
+
 h1 {
   margin: 0 0 0.5rem;
   font-size: 2rem;
@@ -47,6 +66,163 @@ h1 {
 .lede {
   margin: 0 0 2rem;
   color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* --- Форми ---------------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  color: inherit;
+  background: var(--field-bg);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Помилка позначається не лише кольором: під полем є текст, і він звʼязаний
+   із інпутом через aria-describedby. */
+.field input[aria-invalid='true'],
+.field textarea[aria-invalid='true'],
+.field select[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.field__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--error);
+}
+
+.field--checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.field--checkbox input {
+  width: auto;
+  margin-top: 0.3rem;
+}
+
+.field--checkbox label {
+  font-weight: 400;
+}
+
+button {
+  padding: 0.65rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.button--link {
+  padding: 0;
+  font-weight: 400;
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.form__aside {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+/* --- Повідомлення --------------------------------------------------------- */
+
+.alert {
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.alert p {
+  margin: 0;
+}
+
+.alert p + p,
+.alert ul,
+.alert button {
+  margin-top: 0.5rem;
+}
+
+.alert ul {
+  margin-bottom: 0;
+  padding-left: 1.2rem;
+}
+
+.alert--error {
+  color: var(--error);
+}
+
+.alert--ok {
+  color: var(--ok);
+}
+
+.alert--warn {
+  color: var(--warn);
 }
 
 .status {

@@ -50,6 +50,10 @@ model User {
   // Канали сповіщень
   telegramChatId String? @unique
 
+  sessions                Session[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+
   copiesOwned        Copy[]                   @relation("CopyOwner")
   copiesHeld         Copy[]                   @relation("CopyHolder")
   loansAsBorrower    Loan[]                   @relation("LoanBorrower")
@@ -69,6 +73,71 @@ enum Visibility {
   PUBLIC
   FRIENDS
   PRIVATE
+}
+
+// ---------------------------------------------------------------------------
+// Сесії та одноразові токени (§6.1)
+//
+// Цих трьох моделей у §4 немає: розділ описує домен, а не механіку автентифікації.
+// Вони заводяться тут як необхідна залежність §6.1 — «session cookie, не JWT»
+// без серверного сховища сесій нездійсненне.
+//
+// Спільне для всіх трьох: у базі лежить SHA-256 від токена, а не сам токен.
+// Дамп бази чи SQL-ін'єкція з читанням тоді не дають нічим скористатися. Швидкий
+// геш тут доречний саме тому, що токен — це 256 біт із CSPRNG: перебирати нічого,
+// на відміну від пароля користувача (див. password.service.ts).
+// ---------------------------------------------------------------------------
+
+/// Серверна сесія. Кукі несе сирий токен, сюди потрапляє лише його геш.
+model Session {
+  id String @id @default(cuid())
+
+  /// SHA-256 (hex) від токена з кукі. Унікальний — за ним і йде пошук.
+  tokenHash String @unique
+  userId    String
+
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  /// Проставляється при logout. Рядок не видаляється одразу, щоб відкликання
+  /// лишалося видимим до чистки простроченого.
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Одноразовий токен підтвердження пошти (§6.1).
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  /// Одноразовість: перевіряється й проставляється однією атомарною операцією.
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Одноразовий токен скидання пароля (§6.1).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------

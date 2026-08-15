@@ -1,9 +1,13 @@
 import { resolve } from 'node:path'
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { ThrottlerModule } from '@nestjs/throttler'
+import { AuthModule } from './auth/auth.module'
 import { validateEnv } from './config/env.validation'
+import { EmailModule } from './email/email.module'
 import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
+import { UsersModule } from './users/users.module'
 
 /**
  * §12.2: `.env` — один, у корені репозиторію. Шлях однаковий і для `src/`, і для
@@ -18,7 +22,23 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
       envFilePath: ROOT_ENV_PATH,
       validate: validateEnv,
     }),
+    /**
+     * §11: rate limiting. Сховище — в пам'яті процесу, і це навмисно: §2 прямо
+     * виключає Redis зі стека v1, а на десятках користувачів і одному процесі
+     * лічильник у пам'яті робить рівно те, що треба.
+     *
+     * Guard тут НЕ глобальний: §11 вимагає ліміти на чутливих ендпоінтах, а не
+     * на всьому API. Кожен такий маршрут вішає `@UseGuards(ThrottlerGuard)` і
+     * власний `@Throttle` — видно прямо в контролері, що саме обмежено й наскільки.
+     * Значення нижче — стеля, яку ті `@Throttle` звужують.
+     */
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: 'auth', limit: 120, ttl: 60_000 }],
+    }),
     PrismaModule,
+    EmailModule,
+    AuthModule,
+    UsersModule,
     HealthModule,
   ],
 })

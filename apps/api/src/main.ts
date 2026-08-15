@@ -10,7 +10,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule)
   const config = app.get(ConfigService)
 
-  configureApp(app)
+  // Значення береться з провалідованого оточення, а не з сирого process.env:
+  // за Caddy (§13.2) без цього rate limiting рахував би всіх як один IP.
+  configureApp(app, { trustProxy: config.get<string>('NODE_ENV') === 'production' })
 
   app.enableCors({
     origin: config.getOrThrow<string>('WEB_ORIGIN'),

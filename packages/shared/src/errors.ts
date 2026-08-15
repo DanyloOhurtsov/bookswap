@@ -25,6 +25,17 @@ export const API_ERROR_CODES = {
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   /** Непередбачена помилка сервера (HTTP 5xx). Деталі назовні не віддаються. */
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // --- Акаунт і сесії (§6.1) -------------------------------------------------
+  /** Реєстрація на вже зайнятий email (HTTP 409). */
+  EMAIL_TAKEN: 'EMAIL_TAKEN',
+  /**
+   * Логін не вдався (HTTP 401). Один код і на невідомий email, і на хибний
+   * пароль: різні коди перетворили б форму входу на перевірку «чи є такий акаунт».
+   */
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  /** Одноразовий токен із листа недійсний: не існує, прострочений або вже використаний (HTTP 400). */
+  INVALID_TOKEN: 'INVALID_TOKEN',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
