@@ -2,10 +2,13 @@ import { resolve } from 'node:path'
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ThrottlerModule } from '@nestjs/throttler'
+import { AccessModule } from './access/access.module'
 import { AuthModule } from './auth/auth.module'
 import { validateEnv } from './config/env.validation'
 import { EmailModule } from './email/email.module'
+import { FriendsModule } from './friends/friends.module'
 import { HealthModule } from './health/health.module'
+import { NotificationsModule } from './notifications/notifications.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { UsersModule } from './users/users.module'
 
@@ -37,8 +40,11 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
     }),
     PrismaModule,
     EmailModule,
+    AccessModule,
+    NotificationsModule,
     AuthModule,
     UsersModule,
+    FriendsModule,
     HealthModule,
   ],
 })

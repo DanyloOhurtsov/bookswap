@@ -36,6 +36,19 @@ export const API_ERROR_CODES = {
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   /** Одноразовий токен із листа недійсний: не існує, прострочений або вже використаний (HTTP 400). */
   INVALID_TOKEN: 'INVALID_TOKEN',
+
+  // --- Дружба (§6.2, §8) -----------------------------------------------------
+  /** Запит у друзі самому собі (HTTP 400). */
+  FRIENDSHIP_SELF: 'FRIENDSHIP_SELF',
+  /** Пара вже існує: люди друзі або запит уже висить (HTTP 409). */
+  FRIENDSHIP_EXISTS: 'FRIENDSHIP_EXISTS',
+  /**
+   * Пара заблокована (HTTP 403). §6.2: заблокований не бачить бібліотеку й не може
+   * надсилати запити. Тим самим кодом відповідає й спроба зняти чужий блок.
+   */
+  FRIENDSHIP_BLOCKED: 'FRIENDSHIP_BLOCKED',
+  /** Дія неможлива в поточному статусі дружби (HTTP 409). */
+  FRIENDSHIP_INVALID_TRANSITION: 'FRIENDSHIP_INVALID_TRANSITION',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]

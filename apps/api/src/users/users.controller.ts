@@ -63,12 +63,12 @@ export class UsersController {
       )
     }
 
-    const users =
+    const results =
       dto.q !== undefined
         ? await this.users.searchByDisplayName(dto.q, user.id)
         : await this.users.findByExactEmail(dto.email ?? '', user.id)
 
-    return { users }
+    return { results }
   }
 }
 

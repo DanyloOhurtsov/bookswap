@@ -24,6 +24,15 @@ export function toMe(user: UserModel): Me {
   }
 }
 
+/**
+ * §9-проєкція «Інший» на рівні `select`.
+ *
+ * Обмеження стоїть уже в запиті, а не лише в мапері: зайві поля не мають доїжджати
+ * навіть до процесу. Живе поряд із `toPublicUser`, бо це дві половини однієї
+ * гарантії, і розʼїхатися вони не мають права.
+ */
+export const PUBLIC_USER_FIELDS = { id: true, displayName: true, avatarUrl: true } as const
+
 /** §9: «Профіль | Інший | імʼя + аватар». Ні пошти, ні налаштувань видимості. */
 export function toPublicUser(
   user: Pick<UserModel, 'id' | 'displayName' | 'avatarUrl'>,

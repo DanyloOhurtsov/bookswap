@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { friendRelationSchema } from '../domain/friendship'
 import { visibilitySchema } from '../domain/visibility'
 
 /**
@@ -104,8 +105,26 @@ export const userSearchRequestSchema = z
 
 export type UserSearchRequest = z.infer<typeof userSearchRequestSchema>
 
+/**
+ * Знайдена людина разом зі станом звʼязку з нею.
+ *
+ * `relation` рахує API, а не фронт. Спокуса «перетнути список друзів зі списком
+ * результатів на клієнті» виглядає дешевшою, але це рівно та сама авторизаційна
+ * логіка, тільки продубльована за мережею й без доступу до `BLOCKED` — про блок
+ * фронт не дізнається нізвідки, бо заблокованих пар немає в жодному зі списків.
+ *
+ * §9 це не порушує: `relation` описує стосунок того, хто дивиться, а не приватні
+ * дані знайденого. Сама проєкція людини лишається `publicUserSchema`.
+ */
+export const userSearchResultSchema = z.object({
+  user: publicUserSchema,
+  relation: friendRelationSchema,
+})
+
+export type UserSearchResult = z.infer<typeof userSearchResultSchema>
+
 export const userSearchResponseSchema = z.object({
-  users: z.array(publicUserSchema).max(USER_SEARCH_LIMIT),
+  results: z.array(userSearchResultSchema).max(USER_SEARCH_LIMIT),
 })
 
 export type UserSearchResponse = z.infer<typeof userSearchResponseSchema>

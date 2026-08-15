@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import type { App } from 'supertest/types'
 import { API_ERROR_CODES, API_PREFIX, apiErrorSchema } from '@bookswap/shared'
-import { VALID_PASSWORD, createTestApp, uniqueEmail } from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
 
 /**
  * §11: rate limiting на чутливих ендпоінтах.
@@ -44,6 +44,40 @@ describe('Rate limiting (e2e)', () => {
     const last = await request(app.getHttpServer())
       .post(url('/auth/login'))
       .send({ email, password: VALID_PASSWORD })
+      .expect(429)
+
+    expect(apiErrorSchema.parse(last.body).code).toBe(API_ERROR_CODES.TOO_MANY_REQUESTS)
+  })
+
+  it('запити в друзі відсікаються після ліміту (§11)', async () => {
+    // Реєстрація теж під лімітом (5/год), тож акаунт тут рівно один, а запити
+    // йдуть на один і той самий неіснуючий id: throttler рахує звернення, а не
+    // їхній результат, тож 404 у відповідях справі не заважають.
+    const email = uniqueEmail('friend-limit')
+    const registration = await request(app.getHttpServer())
+      .post(url('/auth/register'))
+      .send({ email, password: VALID_PASSWORD, displayName: 'Настирливий' })
+      .expect(201)
+
+    const cookie = sessionCookie(registration.headers)
+    const statuses: number[] = []
+
+    // Ліміт — 30 на годину; 32 звернення мусять упертися в стелю.
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const response = await request(app.getHttpServer())
+        .post(url('/friends/requests'))
+        .set('Cookie', cookie)
+        .send({ userId: 'ckl0000000000000000000000' })
+
+      statuses.push(response.status)
+    }
+
+    expect(statuses.filter((status) => status === 429).length).toBeGreaterThan(0)
+
+    const last = await request(app.getHttpServer())
+      .post(url('/friends/requests'))
+      .set('Cookie', cookie)
+      .send({ userId: 'ckl0000000000000000000000' })
       .expect(429)
 
     expect(apiErrorSchema.parse(last.body).code).toBe(API_ERROR_CODES.TOO_MANY_REQUESTS)

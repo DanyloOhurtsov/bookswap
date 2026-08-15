@@ -244,3 +244,154 @@ button:disabled {
 .status--error {
   color: var(--error);
 }
+
+/* --- Люди й дружба -------------------------------------------------------- */
+
+.friends-section {
+  margin-bottom: 2.5rem;
+}
+
+.friends-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.badge {
+  padding: 0.05rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--muted);
+  border-radius: 1rem;
+}
+
+/* Порожній розділ — не пропуск у верстці, а речення. Інакше сторінка виглядає
+   зламаною там, де вона просто порожня. */
+.empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.person {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.person__who {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.person__name {
+  display: block;
+  font-weight: 600;
+}
+
+.person__meta {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.person__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.avatar {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: 50%;
+  background: var(--field-bg);
+  border: 1px solid var(--line);
+}
+
+.avatar--empty {
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* Другорядна дія має читатися як другорядна: та сама висота, менша вага. */
+.button--ghost {
+  color: var(--fg);
+  background: none;
+  border-color: var(--line);
+}
+
+.button--danger {
+  color: var(--bg);
+  background: var(--error);
+}
+
+.search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.search .field {
+  flex: 1 1 16rem;
+}
+
+/* --- Підтвердження -------------------------------------------------------- */
+
+.dialog {
+  max-width: 28rem;
+  padding: 1.25rem 1.5rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.dialog p {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+}
+
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

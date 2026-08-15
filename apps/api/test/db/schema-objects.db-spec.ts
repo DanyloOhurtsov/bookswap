@@ -74,4 +74,45 @@ describe('обʼєкти схеми поза Prisma Schema', () => {
     expect(rows[0]?.indexdef).toMatch(/APPROVED/)
     expect(rows[0]?.indexdef).toMatch(/HANDED_OVER/)
   })
+
+  it('CHECK-обмеження Friendship існують (§4.3, §5.3.5)', async () => {
+    const rows = await prisma.$queryRaw<{ conname: string; definition: string }[]>`
+      SELECT conname, pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid = '"Friendship"'::regclass AND contype = 'c'
+      ORDER BY conname
+    `
+
+    expect(rows.map((row) => row.conname)).toEqual([
+      'friendship_ab_ordered',
+      'friendship_block_author_valid',
+    ])
+
+    // Порядок пари — строга нерівність, інакше пара «сам із собою» пройшла б.
+    expect(rows[0]?.definition).toMatch(/"userAId" < "userBId"/)
+
+    // Перевірка автора блокування мусить лишатися fail-closed: CASE замість
+    // кон'юнкції порівнянь, і явна перевірка належності до пари. Наївне
+    // `blockedById IN (userAId, userBId)` для NULL дало б NULL, і рядок без
+    // автора мовчки пройшов би — див. коментар у міграції.
+    expect(rows[1]?.definition).toMatch(/CASE/)
+    expect(rows[1]?.definition).toMatch(/"blockedById" IS NOT NULL/)
+    expect(rows[1]?.definition).toMatch(/"blockedById" = "userAId"/)
+    expect(rows[1]?.definition).toMatch(/"blockedById" = "userBId"/)
+    expect(rows[1]?.definition).toMatch(/"blockedById" IS NULL/)
+  })
+
+  it('blockedById має зовнішній ключ на User — від нього залежить право (§6.2)', async () => {
+    const rows = await prisma.$queryRaw<{ definition: string }[]>`
+      SELECT pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid = '"Friendship"'::regclass
+        AND contype = 'f'
+        AND conname = 'Friendship_blockedById_fkey'
+    `
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.definition).toMatch(/REFERENCES "User"\(id\)/)
+    expect(rows[0]?.definition).toMatch(/ON DELETE CASCADE/)
+  })
 })

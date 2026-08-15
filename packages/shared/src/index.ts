@@ -7,6 +7,14 @@ export {
   type ApiErrorCode,
 } from './errors'
 export { VISIBILITY, visibilitySchema, type Visibility } from './domain/visibility'
+export {
+  FRIENDSHIP_STATUS,
+  FRIEND_RELATION,
+  friendRelationSchema,
+  friendshipStatusSchema,
+  type FriendRelation,
+  type FriendshipStatus,
+} from './domain/friendship'
 export { healthResponseSchema, type HealthResponse } from './contracts/health'
 export {
   PASSWORD_LIMITS,
@@ -39,9 +47,31 @@ export {
   updateProfileRequestSchema,
   userSearchRequestSchema,
   userSearchResponseSchema,
+  userSearchResultSchema,
   type Me,
   type PublicUser,
   type UpdateProfileRequest,
   type UserSearchRequest,
   type UserSearchResponse,
+  type UserSearchResult,
 } from './contracts/user'
+export {
+  FRIEND_REQUEST_ACTIONS,
+  createFriendRequestSchema,
+  friendListResponseSchema,
+  friendRequestActionSchema,
+  friendRequestSchema,
+  friendRequestsResponseSchema,
+  friendSchema,
+  friendshipStateResponseSchema,
+  respondFriendRequestSchema,
+  userIdSchema,
+  type CreateFriendRequest,
+  type Friend,
+  type FriendListResponse,
+  type FriendRequest,
+  type FriendRequestAction,
+  type FriendRequestsResponse,
+  type FriendshipStateResponse,
+  type RespondFriendRequest,
+} from './contracts/friendship'

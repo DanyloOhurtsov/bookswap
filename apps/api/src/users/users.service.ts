@@ -2,18 +2,23 @@ import { Injectable } from '@nestjs/common'
 import {
   USER_SEARCH_LIMIT,
   type Me,
-  type PublicUser,
   type UpdateProfileRequest,
+  type UserSearchResult,
 } from '@bookswap/shared'
+import { AccessService } from '../access/access.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { toMe, toPublicUser } from './user.mapper'
+import { PUBLIC_USER_FIELDS, toMe, toPublicUser } from './user.mapper'
+import type { UserModel } from '../generated/prisma/models'
 
 /** §9: стороннім видно лише імʼя та аватар — вибірка обмежена вже на рівні запиту. */
-const PUBLIC_FIELDS = { id: true, displayName: true, avatarUrl: true } as const
+const PUBLIC_FIELDS = PUBLIC_USER_FIELDS
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
   async updateProfile(userId: string, changes: UpdateProfileRequest): Promise<Me> {
     const user = await this.prisma.user.update({ where: { id: userId }, data: changes })
@@ -28,7 +33,7 @@ export class UsersService {
    * заводити нечіткий пошук по людях, поки їх десятки, — вирішувати неіснуючу
    * проблему. Ліміт при цьому є, і він той самий, що бачить фронт.
    */
-  async searchByDisplayName(query: string, viewerId: string): Promise<PublicUser[]> {
+  async searchByDisplayName(query: string, viewerId: string): Promise<UserSearchResult[]> {
     const users = await this.prisma.user.findMany({
       where: {
         displayName: { contains: query, mode: 'insensitive' },
@@ -41,7 +46,7 @@ export class UsersService {
       take: USER_SEARCH_LIMIT,
     })
 
-    return users.map(toPublicUser)
+    return this.annotate(users, viewerId)
   }
 
   /**
@@ -51,11 +56,35 @@ export class UsersService {
    * неможливо додати в друзі того, чию адресу тобі дали. Але підбирати адресу по
    * частинах не можна — саме тому тут немає ні `contains`, ні `startsWith`.
    */
-  async findByExactEmail(email: string, viewerId: string): Promise<PublicUser[]> {
+  async findByExactEmail(email: string, viewerId: string): Promise<UserSearchResult[]> {
     const user = await this.prisma.user.findUnique({ where: { email }, select: PUBLIC_FIELDS })
 
     if (user === null || user.id === viewerId) return []
 
-    return [toPublicUser(user)]
+    return this.annotate([user], viewerId)
+  }
+
+  /**
+   * Дописує до знайдених людей стан звʼязку з ними.
+   *
+   * Рахує `AccessService`, а не фронт: інакше клієнт мусив би перетинати списки
+   * друзів і запитів сам — тобто продублювати авторизаційну логіку за мережею, ще
+   * й без доступу до заблокованих пар, яких немає в жодному зі списків.
+   *
+   * Один запит на весь список (`relationsWith`), не по запиту на людину.
+   */
+  private async annotate(
+    users: Pick<UserModel, 'id' | 'displayName' | 'avatarUrl'>[],
+    viewerId: string,
+  ): Promise<UserSearchResult[]> {
+    const relations = await this.access.relationsWith(
+      viewerId,
+      users.map((user) => user.id),
+    )
+
+    return users.map((user) => ({
+      user: toPublicUser(user),
+      relation: relations.get(user.id) ?? 'NONE',
+    }))
   }
 }

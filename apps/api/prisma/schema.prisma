@@ -62,6 +62,7 @@ model User {
   translationRatings TranslationRating[]
   friendshipsA       Friendship[]             @relation("FriendA")
   friendshipsB       Friendship[]             @relation("FriendB")
+  friendshipsBlocked Friendship[]             @relation("FriendshipBlockedBy")
   wishlist           WishlistItem[]
   notifications      Notification[]
   notificationPrefs  NotificationPreference[]
@@ -155,11 +156,26 @@ model Friendship {
   /// §4.3: НЕ виводиться з A/B. Порядок задає сортування id, а не те, хто ініціював.
   requestedById String
 
+  /// Хто ініціював BLOCKED. Поля §4.3 не має — це свідоме доповнення: без нього
+  /// статус симетричний, тобто не відрізнити «я заблокував» від «мене заблокували»,
+  /// а отже нікому не можна дати право зняти блок. `requestedById` для цього не
+  /// годиться: він означає ініціатора ЗАПИТУ, і §4.3 прямо вимагає тримати його
+  /// окремо.
+  ///
+  /// На відміну від `requestedById`, тут є справжній зовнішній ключ: від цього
+  /// поля залежить ПРАВО (знімати блок може лише той, хто в ньому записаний), а
+  /// право не можна тримати на рядку, який БД не перевіряє. Решту — що значення
+  /// заповнене саме тоді, коли статус BLOCKED, і що це один з учасників пари —
+  /// тримає CHECK `friendship_block_author_valid`.
+  blockedById String?
+
   createdAt   DateTime  @default(now())
   respondedAt DateTime?
 
   userA User @relation("FriendA", fields: [userAId], references: [id], onDelete: Cascade)
   userB User @relation("FriendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  blockedBy User? @relation("FriendshipBlockedBy", fields: [blockedById], references: [id], onDelete: Cascade)
 
   @@unique([userAId, userBId])
   @@index([userBId, status])

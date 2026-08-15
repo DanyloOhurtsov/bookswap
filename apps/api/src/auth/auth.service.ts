@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { API_ERROR_CODES } from '@bookswap/shared'
 import type { ConfirmPasswordResetRequest, LoginRequest, RegisterRequest } from '@bookswap/shared'
 import { ApiException } from '../common/api.exception'
+import { isUniqueViolation } from '../common/prisma-errors'
 import { EMAIL_SENDER, type EmailSender } from '../email/email-sender'
 import { PrismaService } from '../prisma/prisma.service'
 import { EMAIL_VERIFICATION_TTL_MS, PASSWORD_RESET_TTL_MS } from './auth.constants'
@@ -223,10 +224,6 @@ export class AuthService {
 
 function isUsable(record: { usedAt: Date | null; expiresAt: Date }): boolean {
   return record.usedAt === null && record.expiresAt.getTime() > Date.now()
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
 }
 
 function emailTaken(): ApiException {

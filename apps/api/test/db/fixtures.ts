@@ -34,9 +34,22 @@ export async function createUser(prisma: PrismaClient, displayName = 'Тест')
   return user.id
 }
 
-export async function createGraph(prisma: PrismaClient): Promise<Graph> {
-  const ownerId = await createUser(prisma, 'Власник')
-  const borrowerId = await createUser(prisma, 'Позичальник')
+/**
+ * Обидва id опційні: e2e-тестам граф потрібен на вже зареєстрованих користувачів,
+ * бо лоан має належати тим самим людям, які дружать через API. Для db-тестів, яким
+ * байдуже, хто власник, поведінка лишається незмінною.
+ */
+export interface GraphOptions {
+  ownerId?: string
+  borrowerId?: string
+}
+
+export async function createGraph(
+  prisma: PrismaClient,
+  options: GraphOptions = {},
+): Promise<Graph> {
+  const ownerId = options.ownerId ?? (await createUser(prisma, 'Власник'))
+  const borrowerId = options.borrowerId ?? (await createUser(prisma, 'Позичальник'))
 
   const work = await prisma.work.create({
     data: {

@@ -164,9 +164,9 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      const { users } = userSearchResponseSchema.parse(response.body)
+      const { results } = userSearchResponseSchema.parse(response.body)
 
-      expect(users.map((user) => user.displayName)).toContain('Северин Наливайко')
+      expect(results.map((result) => result.user.displayName)).toContain('Северин Наливайко')
     })
 
     it('віддає лише імʼя та аватар — §9, «Інший»', async () => {
@@ -179,9 +179,25 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      expect(
-        Object.keys(userSearchResponseSchema.parse(response.body).users[0] ?? {}).sort(),
-      ).toEqual(['avatarUrl', 'displayName', 'id'])
+      const [result] = userSearchResponseSchema.parse(response.body).results
+
+      // Сама людина лишається §9-проєкцією «Інший»; `relation` описує стосунок
+      // того, хто дивиться, а не приватні дані знайденого.
+      expect(Object.keys(result?.user ?? {}).sort()).toEqual(['avatarUrl', 'displayName', 'id'])
+      expect(Object.keys(result ?? {}).sort()).toEqual(['relation', 'user'])
+    })
+
+    it('позначає стан звʼязку — незнайомець це NONE', async () => {
+      const { cookie } = await register('Незнайомий')
+      await register('Зовсім Чужий')
+
+      const response = await request(app.getHttpServer())
+        .get(url('/users'))
+        .query({ q: 'Зовсім Чужий' })
+        .set('Cookie', cookie)
+        .expect(200)
+
+      expect(userSearchResponseSchema.parse(response.body).results[0]?.relation).toBe('NONE')
     })
 
     it('за email знаходить лише при точному збігу', async () => {
@@ -194,7 +210,7 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      expect(userSearchResponseSchema.parse(exact.body).users).toHaveLength(1)
+      expect(userSearchResponseSchema.parse(exact.body).results).toHaveLength(1)
 
       // Префікс адреси не має знаходити нікого — інакше пошту можна перебрати
       // по літері, і §6.1 «за email тільки точний збіг» перестає щось означати.
@@ -205,7 +221,7 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      expect(userSearchResponseSchema.parse(partial.body).users).toHaveLength(0)
+      expect(userSearchResponseSchema.parse(partial.body).results).toHaveLength(0)
     })
 
     it('email порівнюється без урахування регістру — так само, як при реєстрації', async () => {
@@ -218,7 +234,7 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      expect(userSearchResponseSchema.parse(response.body).users).toHaveLength(1)
+      expect(userSearchResponseSchema.parse(response.body).results).toHaveLength(1)
     })
 
     it('не показує самого себе', async () => {
@@ -236,8 +252,8 @@ describe('Профіль і пошук людей (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
 
-      expect(userSearchResponseSchema.parse(byName.body).users).toHaveLength(0)
-      expect(userSearchResponseSchema.parse(byEmail.body).users).toHaveLength(0)
+      expect(userSearchResponseSchema.parse(byName.body).results).toHaveLength(0)
+      expect(userSearchResponseSchema.parse(byEmail.body).results).toHaveLength(0)
     })
 
     it('вимагає рівно один параметр', async () => {
