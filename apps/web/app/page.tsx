@@ -10,8 +10,8 @@ export default function HomePage() {
     <main className="page">
       <h1>BookSwap</h1>
       <p className="lede">
-        Сервіс обміну фізичними книжками. Готові акаунт, профіль і дружба; каталог і позичання
-        зʼявляться наступними етапами.
+        Сервіс обміну фізичними книжками. Готові акаунт, профіль, дружба, каталог і особиста
+        бібліотека; позичання зʼявиться наступним етапом.
       </p>
 
       <nav className="actions" aria-label="Основні дії">
@@ -19,6 +19,8 @@ export default function HomePage() {
         <Link href="/login">Увійти</Link>
         <Link href="/profile">Профіль</Link>
         <Link href="/friends">Друзі</Link>
+        <Link href="/catalog">Каталог</Link>
+        <Link href="/library">Моя бібліотека</Link>
       </nav>
 
       <HealthStatus />

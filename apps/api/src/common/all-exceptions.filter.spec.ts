@@ -98,6 +98,28 @@ describe('AllExceptionsFilter', () => {
     expect(captured.body).toEqual({ code: 'CONFLICT', message: 'Копія вже позичена' })
   })
 
+  it('доносить машиночитні деталі доменного винятку до тіла відповіді', () => {
+    // `EDITION_ISBN_TAKEN` віддає id наявного видання, щоб клієнт довів людину
+    // до нього (§6.3, крок 3), а не просто показав помилку. Поле мусить пройти
+    // крізь фільтр — саме тут воно колись мовчки губилося.
+    filter.catch(
+      new ApiException(
+        API_ERROR_CODES.EDITION_ISBN_TAKEN,
+        'Видання з таким ISBN уже є в каталозі',
+        HttpStatus.CONFLICT,
+        { editionId: 'edition-1' },
+      ),
+      createHost(captured),
+    )
+
+    expect(captured.status).toBe(409)
+    expect(captured.body).toEqual({
+      code: API_ERROR_CODES.EDITION_ISBN_TAKEN,
+      message: 'Видання з таким ISBN уже є в каталозі',
+      details: { editionId: 'edition-1' },
+    })
+  })
+
   it('порушення валідації йдуть у details, а не склеюються в message', () => {
     filter.catch(
       new BadRequestException({

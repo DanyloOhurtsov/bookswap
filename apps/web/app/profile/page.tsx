@@ -243,7 +243,7 @@ function ProfileForm({ user, onUpdated }: { user: Me; onUpdated: (user: Me) => v
       </form>
 
       <p className="form__aside">
-        <Link href="/friends">Друзі</Link> ·{' '}
+        <Link href="/friends">Друзі</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
         <button type="button" className="button--link" onClick={() => void logout()}>
           Вийти
         </button>{' '}

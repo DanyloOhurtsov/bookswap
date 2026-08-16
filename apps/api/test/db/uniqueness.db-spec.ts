@@ -115,7 +115,9 @@ describe('унікальні обмеження §4', () => {
 
   it('WorkAuthor — складений ключ (work, author, role): та сама людина в різних ролях', async () => {
     const graph = await createGraph(prisma)
-    const author = await prisma.author.create({ data: { name: 'Автор і перекладач' } })
+    const author = await prisma.author.create({
+      data: { name: 'Автор і перекладач', nameNorm: 'автор і перекладач' },
+    })
     const link = { workId: graph.workId, authorId: author.id }
 
     await prisma.workAuthor.create({ data: { ...link, role: AuthorRole.AUTHOR } })

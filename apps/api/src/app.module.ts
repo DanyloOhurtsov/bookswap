@@ -4,10 +4,12 @@ import { ConfigModule } from '@nestjs/config'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { AccessModule } from './access/access.module'
 import { AuthModule } from './auth/auth.module'
+import { CatalogModule } from './catalog/catalog.module'
 import { validateEnv } from './config/env.validation'
 import { EmailModule } from './email/email.module'
 import { FriendsModule } from './friends/friends.module'
 import { HealthModule } from './health/health.module'
+import { LibraryModule } from './library/library.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { UsersModule } from './users/users.module'
@@ -45,6 +47,8 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
     AuthModule,
     UsersModule,
     FriendsModule,
+    CatalogModule,
+    LibraryModule,
     HealthModule,
   ],
 })

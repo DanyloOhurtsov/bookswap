@@ -425,7 +425,8 @@ function FriendsView() {
       />
 
       <p className="form__aside">
-        <Link href="/profile">Профіль</Link> · <Link href="/">На головну</Link>
+        <Link href="/profile">Профіль</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
+        <Link href="/catalog">Каталог</Link> · <Link href="/">На головну</Link>
       </p>
     </Shell>
   )
@@ -531,6 +532,9 @@ function FriendRow({
     <li className="person">
       <Person user={friend.user} meta={`Друзі з ${formatDate(friend.friendsSince)}`} />
       <div className="person__actions">
+        {/* §6.5: бібліотеку друга видно рівно в межах матриці §9 — що саме,
+            вирішує API, тож посилання безумовне. */}
+        <Link href={`/users/${friend.user.id}/library`}>Бібліотека</Link>
         <button
           type="button"
           className="button--ghost"

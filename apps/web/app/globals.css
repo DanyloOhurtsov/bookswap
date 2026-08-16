@@ -395,3 +395,105 @@ button:disabled {
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+/* --- Каталог і бібліотека -------------------------------------------------- */
+
+.books {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.book {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.book__title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.book__meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Видання під твором — вужчий блок, щоб було видно, що це не окремі книжки. */
+.book__editions,
+.copies {
+  margin: 0.35rem 0 0;
+  padding: 0 0 0 0.9rem;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+  border-left: 2px solid var(--line);
+}
+
+.copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Ознаки перекладу (§10.3) — факти, а не оцінки, тому нейтральні. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.05rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.authors {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.authors legend {
+  padding: 0 0.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.author-row {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed var(--line);
+}
+
+.author-row:last-of-type {
+  padding-bottom: 0;
+  border-bottom: none;
+}

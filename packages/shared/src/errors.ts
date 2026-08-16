@@ -49,6 +49,26 @@ export const API_ERROR_CODES = {
   FRIENDSHIP_BLOCKED: 'FRIENDSHIP_BLOCKED',
   /** Дія неможлива в поточному статусі дружби (HTTP 409). */
   FRIENDSHIP_INVALID_TRANSITION: 'FRIENDSHIP_INVALID_TRANSITION',
+
+  // --- Каталог і бібліотека (§6.3–6.4, §8) -----------------------------------
+  /**
+   * ISBN-13 уже належить іншому виданню (HTTP 409). `details: { editionId }` —
+   * саме тому цей випадок має власний код: клієнт не показує помилку, а веде
+   * людину до наявного видання, де їй лишається створити тільки `Copy` (§6.3).
+   */
+  EDITION_ISBN_TAKEN: 'EDITION_ISBN_TAKEN',
+  /**
+   * Примірник не можна видалити, поки є лоан у `APPROVED` або `HANDED_OVER`
+   * (§5.2, HTTP 409). Окремий код, бо дія користувача тут інша: не «спробуйте
+   * ще раз», а «спершу заберіть книжку».
+   */
+  COPY_HAS_ACTIVE_LOAN: 'COPY_HAS_ACTIVE_LOAN',
+  /**
+   * Власник не може перемкнути `status` просто зараз: книжка не вдома або має
+   * активний лоан (HTTP 409). Стосується **лише** поля `status` — решта полів
+   * примірника редагується завжди.
+   */
+  COPY_STATUS_LOCKED: 'COPY_STATUS_LOCKED',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]

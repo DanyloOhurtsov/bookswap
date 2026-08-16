@@ -45,12 +45,20 @@ function codeForStatus(status: number): ApiErrorCode {
 function describe(response: string | object): { message: string; details?: unknown } {
   if (typeof response === 'string') return { message: response }
 
-  const raw = (response as Record<string, unknown>).message
+  const body = response as Record<string, unknown>
+  const raw = body.message
 
   // ValidationPipe (§11) віддає масив порушених обмежень — він іде в details,
   // а не склеюється в одне рядкове повідомлення.
   if (Array.isArray(raw)) return { message: 'Validation failed', details: raw }
-  if (typeof raw === 'string' && raw.length > 0) return { message: raw }
+
+  if (typeof raw === 'string' && raw.length > 0) {
+    // `ApiException` може нести машиночитні деталі поруч із кодом — напр.
+    // `EDITION_ISBN_TAKEN` віддає id наявного видання, щоб клієнт довів людину
+    // до нього, а не просто показав помилку. Без цієї гілки поле мовчки гинуло б
+    // тут, і про це дізналися б із того, що фронт «чомусь не працює».
+    return body.details === undefined ? { message: raw } : { message: raw, details: body.details }
+  }
 
   return { message: 'Request failed' }
 }

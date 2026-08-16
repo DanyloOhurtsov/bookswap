@@ -36,8 +36,36 @@ describe('обʼєкти схеми поза Prisma Schema', () => {
     `
 
     expect(rows).toHaveLength(2)
-    expect(rows[0]?.indexdef).toMatch(/USING gin \(name gin_trgm_ops\)/)
+    // Обидва — по нормалізованій колонці: similarity() регістрозалежна, тож
+    // індекс по сирому `name` не знаходив би «ґреґорі» в «Ґреґорі Робертс».
+    expect(rows[0]?.indexdef).toMatch(/USING gin \("nameNorm" gin_trgm_ops\)/)
     expect(rows[1]?.indexdef).toMatch(/USING gin \("titleNorm" gin_trgm_ops\)/)
+  })
+
+  /**
+   * Функція нормалізації — єдине визначення «lower + unaccent» (§4.4) на весь
+   * застосунок: нею заповнюються `titleNorm` і `nameNorm`, нею ж нормалізується
+   * пошуковий запит. Якщо міграцію колись перепишуть без неї, ламатися має тут,
+   * а не мовчазним «пошук нічого не знаходить».
+   */
+  it('bookswap_norm існує, IMMUTABLE і робить lower + unaccent', async () => {
+    // `provolatile` має внутрішній тип "char", який Prisma не десеріалізує, —
+    // звідси явний ::text.
+    const [volatility] = await prisma.$queryRaw<{ provolatile: string }[]>`
+      SELECT provolatile::text AS provolatile FROM pg_proc WHERE proname = 'bookswap_norm'
+    `
+
+    // 'i' = IMMUTABLE. Без цього функцію не можна класти в індексний вираз, а
+    // сам unaccent/1 лише STABLE — тому в тілі стоїть двоаргументний виклик.
+    expect(volatility?.provolatile).toBe('i')
+
+    const [normalized] = await prisma.$queryRaw<{ value: string }[]>`
+      SELECT bookswap_norm('Café Zürich Їжак') AS value
+    `
+
+    // Латинська діакритика знімається, українські літери лишаються собою:
+    // саме через це нормалізація живе в БД, а не в TS (там NFD зробив би «іжак»).
+    expect(normalized?.value).toBe('cafe zurich їжак')
   })
 
   it('similarity() ловить назву з друкарською помилкою (§6.3, крок 2)', async () => {
@@ -61,6 +89,25 @@ describe('обʼєкти схеми поза Prisma Schema', () => {
     `
 
     expect(found).toEqual([{ title: 'Шантарам' }])
+  })
+
+  /**
+   * Пошук використовує оператор `%` (єдиний, що лягає на GIN-індекс) і фіксує
+   * поріг на транзакцію. Перевіряється саме поведінка `set_config(..., true)`:
+   * якщо вона перестане працювати, поріг мовчки з'їде на серверний дефолт.
+   */
+  it('поріг схожості фіксується на транзакцію (§6.3: 0.3)', async () => {
+    const [row] = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('pg_trgm.similarity_threshold', '0.3', true)`
+
+      return tx.$queryRaw<{ matched: boolean; threshold: string }[]>`
+        SELECT 'шантарам' % 'шантрам' AS matched,
+               current_setting('pg_trgm.similarity_threshold') AS threshold
+      `
+    })
+
+    expect(row?.matched).toBe(true)
+    expect(row?.threshold).toBe('0.3')
   })
 
   it('one_active_loan_per_copy — унікальний частковий індекс саме на двох статусах (§5.3)', async () => {

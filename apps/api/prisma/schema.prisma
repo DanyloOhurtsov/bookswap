@@ -193,16 +193,25 @@ enum FriendshipStatus {
 // ---------------------------------------------------------------------------
 
 model Author {
-  id        String  @id @default(cuid())
-  name      String
+  id   String @id @default(cuid())
+  name String
+  /// lower + unaccent, для пошуку — дзеркало `Work.titleNorm`.
+  ///
+  /// ВІДХИЛЕННЯ ВІД §4.4: цієї колонки в специфікації немає. Без неї fuzzy-пошук
+  /// по автору не працює, бо `similarity()` регістрозалежна: «ґреґорі» проти
+  /// «Ґреґорі Робертс» дає майже нуль спільних триграм. Заповнюється тією самою
+  /// SQL-функцією `bookswap_norm`, що й `titleNorm`, тож нормалізація лишається
+  /// однією на весь каталог.
+  nameNorm  String
   nameLatin String?
 
   works WorkAuthor[]
 
   @@index([name])
+  @@index([nameNorm])
   // §4.9: GIN-індекс для fuzzy-пошуку (§6.3, крок 2). `pg_trgm` створюється сирим
   // SQL на початку першої міграції — інакше на чистій базі CREATE INDEX упаде.
-  @@index([name(ops: raw("gin_trgm_ops"))], map: "author_name_trgm_idx", type: Gin)
+  @@index([nameNorm(ops: raw("gin_trgm_ops"))], map: "author_name_trgm_idx", type: Gin)
 }
 
 model WorkAuthor {

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { config as loadDotenv } from 'dotenv'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { normalizeSearchText } from '../src/catalog/search-text'
 import { PrismaClient } from '../src/generated/prisma/client'
 import {
   AuthorRole,
@@ -20,19 +21,6 @@ import {
  * стейт-машини (§5), якого ще не існує. Рядок `Loan`, вставлений повз неї, розійшовся
  * би зі станом `Copy`.
  */
-
-/**
- * `Work.titleNorm` = lower + unaccent (§4.4). Канонічне визначення — постгресівське
- * `lower(unaccent(title))`; тут його TS-наближення для seed-даних. Коли зʼявиться
- * каталог (§6.3, етап 4), нормалізація має переїхати в спільний код разом із
- * пошуком, а не дублюватися.
- */
-function normalizeTitle(title: string): string {
-  return title
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase()
-}
 
 /**
  * §4.3 та інваріант §5.3.5: `userAId < userBId` лексикографічно. Порядок задає
@@ -114,11 +102,23 @@ export async function seed(prisma: PrismaClient): Promise<void> {
   }
 
   // --- Автори (§4.4) --------------------------------------------------------
-  for (const author of AUTHORS) {
+  // `nameNorm` і `titleNorm` рахує та сама SQL-функція `bookswap_norm`, що й
+  // пошук (§6.3). Тут навмисно немає TS-наближення: воно розійшлося б із
+  // постгресівським `unaccent` на першому ж слові з «ї».
+  const authorNames = await normalizeSearchText(
+    prisma,
+    AUTHORS.map((author) => author.name),
+  )
+
+  for (const [index, author] of AUTHORS.entries()) {
+    const nameNorm = authorNames[index]
+
+    if (nameNorm === undefined) throw new Error(`Не вдалося нормалізувати імʼя: ${author.name}`)
+
     await prisma.author.upsert({
       where: { id: author.id },
       update: {},
-      create: author,
+      create: { ...author, nameNorm },
     })
   }
 
@@ -150,13 +150,21 @@ export async function seed(prisma: PrismaClient): Promise<void> {
     },
   ]
 
-  for (const work of works) {
+  const workTitles = await normalizeSearchText(
+    prisma,
+    works.map((work) => work.title),
+  )
+
+  for (const [index, work] of works.entries()) {
     const { authorId, ...fields } = work
+    const titleNorm = workTitles[index]
+
+    if (titleNorm === undefined) throw new Error(`Не вдалося нормалізувати назву: ${work.title}`)
 
     await prisma.work.upsert({
       where: { id: work.id },
       update: {},
-      create: { ...fields, titleNorm: normalizeTitle(work.title) },
+      create: { ...fields, titleNorm },
     })
 
     await prisma.workAuthor.upsert({
