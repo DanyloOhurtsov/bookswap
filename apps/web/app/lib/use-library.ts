@@ -1,36 +1,30 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
 import {
   borrowedLibraryResponseSchema,
   libraryResponseSchema,
   visibleLibraryResponseSchema,
-  type BorrowedLibraryGroup,
-  type LibraryGroup,
+  type BorrowedLibraryResponse,
   type LibraryQueryRequest,
-  type PublicUser,
-  type VisibleLibraryGroup,
+  type LibraryResponse,
+  type VisibleLibraryResponse,
 } from '@bookswap/shared'
-import { apiRequest, describeError } from './api'
+import { useApiResource, type Resource } from './use-resource'
 
 /**
- * §6.4: три в'ю однієї бібліотеки — «мої», «мої не вдома», «чужі в мене» — і
- * третє повертає інший тип примірника (там видно власника, але не його нотатки).
- * Тому стан параметризований групою, а не один на всі випадки.
+ * §6.4: три в'ю однієї бібліотеки — «мої», «мої не вдома», «чужі в мене».
+ *
+ * Хуки два, а не один, і це не дублювання: «чужі в мене» віддає інший тип
+ * примірника (там видно власника, але не його нотатки) і не має жодної мутації.
+ * Один хук на обидва випадки або повертав би union, який довелося б звужувати
+ * приведенням типу, або вдавав би, що дві різні відповіді — одна.
  */
 export type LibraryView = 'own' | 'out' | 'borrowed'
 
-export type LibraryState =
-  | { status: 'loading' }
-  | { status: 'ready'; view: 'own' | 'out'; groups: LibraryGroup[] }
-  | { status: 'ready'; view: 'borrowed'; groups: BorrowedLibraryGroup[] }
-  | { status: 'error'; message: string }
-
-const PATHS: Readonly<Record<LibraryView, string>> = {
+const OWN_PATHS = {
   own: '/me/library',
   out: '/me/library/out',
-  borrowed: '/me/library/borrowed',
-}
+} as const
 
 /** Фільтри §8 у рядок запиту. Порожні значення не додаються — це «без фільтра». */
 function toQuery(filters: LibraryQueryRequest): string {
@@ -45,95 +39,34 @@ function toQuery(filters: LibraryQueryRequest): string {
   return query === '' ? '' : `?${query}`
 }
 
-export function useLibrary(
-  view: LibraryView,
+/** §8: `GET /me/library` і `GET /me/library/out`. Фільтри — лише в першої. */
+export function useOwnLibrary(
+  view: 'own' | 'out',
   filters: LibraryQueryRequest,
-): { state: LibraryState; reload: () => void } {
-  const [state, setState] = useState<LibraryState>({ status: 'loading' })
-  const [nonce, setNonce] = useState(0)
-
-  // Фільтри — обʼєкт, тож у списку залежностей має бути його вміст, а не він сам:
-  // новий літерал на кожен рендер запускав би запит нескінченно.
+): Resource<LibraryResponse> {
+  // Фільтри — обʼєкт, тож ключем стає рядок запиту, а не він сам: новий літерал
+  // на кожен рендер перезапускав би завантаження нескінченно.
   const query = view === 'own' ? toQuery(filters) : ''
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load(): Promise<void> {
-      try {
-        if (view === 'borrowed') {
-          const response = await apiRequest(PATHS.borrowed, {
-            schema: borrowedLibraryResponseSchema,
-            signal: controller.signal,
-          })
-
-          setState({ status: 'ready', view: 'borrowed', groups: response.groups })
-          return
-        }
-
-        const response = await apiRequest(`${PATHS[view]}${query}`, {
-          schema: libraryResponseSchema,
-          signal: controller.signal,
-        })
-
-        setState({ status: 'ready', view, groups: response.groups })
-      } catch (error) {
-        if (controller.signal.aborted) return
-
-        setState({ status: 'error', message: describeError(error) })
-      }
-    }
-
-    void load()
-
-    return () => {
-      controller.abort()
-    }
-  }, [view, query, nonce])
-
-  const reload = useCallback(() => {
-    setNonce((value) => value + 1)
-  }, [])
-
-  return { state, reload }
+  return useApiResource(`${OWN_PATHS[view]}${query}`, libraryResponseSchema)
 }
 
-export type FriendLibraryState =
-  | { status: 'loading' }
-  | { status: 'ready'; owner: PublicUser; groups: VisibleLibraryGroup[] }
-  | { status: 'error'; message: string }
+/** §6.4, в'ю «Чужі книжки в мене»: `currentHolderId = me AND ownerId ≠ me`. */
+export function useBorrowedLibrary(): Resource<BorrowedLibraryResponse> {
+  return useApiResource('/me/library/borrowed', borrowedLibraryResponseSchema)
+}
 
 /**
  * Бібліотека іншої людини. Рішення «чи можна це бачити» ухвалює API (§9), тож
  * фронт не фільтрує нічого — він показує рівно те, що приїхало.
+ *
+ * Перезавантаження потрібне кнопці «Попросити» (§6.5): після надісланого запиту
+ * примірник лишається `AVAILABLE` (§5.1), і єдине, що змінюється, — `canRequest`
+ * та `myActiveLoan` у відповіді.
  */
-export function useFriendLibrary(userId: string): FriendLibraryState {
-  const [state, setState] = useState<FriendLibraryState>({ status: 'loading' })
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function load(): Promise<void> {
-      try {
-        const response = await apiRequest(`/users/${encodeURIComponent(userId)}/library`, {
-          schema: visibleLibraryResponseSchema,
-          signal: controller.signal,
-        })
-
-        setState({ status: 'ready', owner: response.owner, groups: response.groups })
-      } catch (error) {
-        if (controller.signal.aborted) return
-
-        setState({ status: 'error', message: describeError(error) })
-      }
-    }
-
-    void load()
-
-    return () => {
-      controller.abort()
-    }
-  }, [userId])
-
-  return state
+export function useFriendLibrary(userId: string): Resource<VisibleLibraryResponse> {
+  return useApiResource(
+    `/users/${encodeURIComponent(userId)}/library`,
+    visibleLibraryResponseSchema,
+  )
 }

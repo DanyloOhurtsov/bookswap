@@ -16,9 +16,11 @@ import {
 import { AuthorLine, Chip, EditionLine } from '../../components/book'
 import { SelectField, TextField } from '../../components/form-field'
 import { FormStatus } from '../../components/form-status'
+import { HistoryEntryLine } from '../../components/history'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../lib/labels'
 import { useWork } from '../../lib/use-catalog'
+import { useWorkHistory } from '../../lib/use-history'
 import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'
 
@@ -26,13 +28,16 @@ import { validate, type FieldErrors } from '../../lib/validation'
  * Сторінка твору: метадані, переклади з ознаками §10.3 і видання.
  *
  * Примірників тут немає — ні своїх, ні друзів. Каталог однаковий для всіх, а хто
- * чим володіє, живе за матрицею §9 у бібліотеках. Позначка «у кого з друзів це
- * є» приїде разом із позичанням, де вона й потрібна.
+ * чим володіє, живе за матрицею §9 у бібліотеках.
+ *
+ * Знизу — історія твору (§6.6, «хто з моїх це взагалі читав»). Вона відповідає на
+ * те саме питання, заради якого §6.5 хотіла позначку «у кого з друзів це є», але
+ * чесніше: не «у кого лежить», а «хто справді брав», і без переліку чужих полиць.
  */
 export default function WorkPage() {
   const parameters = useParams<{ id: string }>()
   const router = useRouter()
-  const { state: session } = useSession()
+  const { state: session, reload: reloadSession } = useSession()
   const workId = parameters.id
   const { state, reload } = useWork(workId)
 
@@ -44,6 +49,22 @@ export default function WorkPage() {
     return (
       <Shell>
         <p className="status status--pending">Завантажую…</p>
+      </Shell>
+    )
+  }
+
+  // Збій перевірки сесії — це НЕ «ви не залогінені»: редирект робиться лише для
+  // `guest`, тож «Переадресовую…» тут ніколи б не справдилося.
+  if (session.status === 'error') {
+    return (
+      <Shell>
+        <FormStatus error={new Error(session.message)} />
+        <p className="form__aside">
+          <button type="button" onClick={reloadSession}>
+            Спробувати ще раз
+          </button>{' '}
+          · <Link href="/login">Увійти</Link>
+        </p>
       </Shell>
     )
   }
@@ -115,11 +136,63 @@ export default function WorkPage() {
         )}
       </section>
 
+      <WorkHistorySection workId={workId} />
+
       <p className="form__aside">
         <Link href={`/catalog/new?workId=${work.id}`}>Додати переклад або видання</Link> ·{' '}
         <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link>
       </p>
     </main>
+  )
+}
+
+/**
+ * §6.6: «хто з моїх це взагалі читав».
+ *
+ * Специфікація називає це кориснішим за історію примірника — і саме тому воно
+ * тут, на сторінці твору: питання «чи варто просити цю книжку» ставлять до того,
+ * як обрали конкретний том. Обсяг — примірники друзів і свої; чужі сюди не
+ * потрапляють, і фільтрує їх сервер за §9.
+ */
+function WorkHistorySection({ workId }: { workId: string }) {
+  const { state } = useWorkHistory(workId)
+
+  if (state.status === 'loading') {
+    return (
+      <section className="friends-section">
+        <h2>Хто з друзів це читав</h2>
+        <p className="status status--pending">Завантажую…</p>
+      </section>
+    )
+  }
+
+  if (state.status === 'error') {
+    return (
+      <section className="friends-section">
+        <h2>Хто з друзів це читав</h2>
+        <FormStatus error={new Error(state.message)} />
+      </section>
+    )
+  }
+
+  return (
+    <section className="friends-section">
+      <h2>Хто з друзів це читав</h2>
+      {state.data.entries.length === 0 ? (
+        <p className="empty">Серед ваших друзів цю книжку ще ніхто не позичав.</p>
+      ) : (
+        <ul className="copies">
+          {state.data.entries.map((item, index) => (
+            <HistoryEntryLine
+              // Анонімний запис не має `loanId` навмисно (§6.6): за ним два зрізи
+              // чужої історії склеїлися б в одну людину.
+              key={item.entry.names ? item.entry.loanId : `anon-${String(index)}`}
+              entry={item.entry}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 

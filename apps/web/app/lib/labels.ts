@@ -1,4 +1,13 @@
-import type { AuthorRole, Condition, CopyStatus, EditionFormat, Visibility } from '@bookswap/shared'
+import type {
+  AuthorRole,
+  Condition,
+  CopyStatus,
+  EditionFormat,
+  LoanAction,
+  LoanStatus,
+  NotificationType,
+  Visibility,
+} from '@bookswap/shared'
 
 /**
  * Людські підписи до доменних enum'ів.
@@ -27,6 +36,46 @@ export const COPY_STATUS_LABELS: Readonly<Record<CopyStatus, string>> = {
   RESERVED: 'Домовлено про передачу',
   LENT_OUT: 'У позичальника',
   UNAVAILABLE: 'Тимчасово не даю',
+}
+
+/**
+ * §5.1 у словах користувача.
+ *
+ * `RESERVED`/`APPROVED` навмисно звучать як «домовлено», а не «підтверджено»:
+ * §5.2 наполягає, що підтвердження — ще не передача, і підпис має говорити те
+ * саме, інакше людина вважатиме, що книжка вже її.
+ */
+export const LOAN_STATUS_LABELS: Readonly<Record<LoanStatus, string>> = {
+  REQUESTED: 'Чекає на відповідь',
+  APPROVED: 'Домовлено, ще не передано',
+  REJECTED: 'Відмовлено',
+  CANCELLED: 'Скасовано',
+  HANDED_OVER: 'На руках',
+  RETURNED: 'Повернено',
+  LOST: 'Втрачено',
+}
+
+/** Підписи кнопок §8. Дієслово від першої особи того, хто тисне. */
+export const LOAN_ACTION_LABELS: Readonly<Record<LoanAction, string>> = {
+  approve: 'Погодити',
+  reject: 'Відмовити',
+  cancel: 'Скасувати',
+  hand_over: 'Я отримав книжку',
+  return: 'Книжку повернуто',
+  mark_lost: 'Позначити втраченою',
+}
+
+export const NOTIFICATION_TYPE_LABELS: Readonly<Record<NotificationType, string>> = {
+  LOAN_REQUESTED: 'У вас просять книжку',
+  LOAN_APPROVED: 'Ваше прохання погодили',
+  LOAN_REJECTED: 'Книжку не дали',
+  LOAN_CANCELLED: 'Домовленість скасовано',
+  LOAN_HANDED_OVER: 'Книжку передано',
+  LOAN_RETURNED: 'Книжку повернуто',
+  LOAN_DUE_SOON: 'Скоро повертати',
+  LOAN_OVERDUE: 'Термін минув',
+  FRIEND_REQUESTED: 'Новий запит у друзі',
+  FRIEND_ACCEPTED: 'Запит у друзі прийнято',
 }
 
 export const EDITION_FORMAT_LABELS: Readonly<Record<EditionFormat, string>> = {

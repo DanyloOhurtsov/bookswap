@@ -520,10 +520,16 @@ model TelegramLinkToken {
   @@index([userId])
 }
 
+/// `LOAN_CANCELLED` — свідоме доповнення до §4.8. §5.1 для переходу
+/// `APPROVED → CANCELLED` вимагає «сповіщення другій стороні», але типу під нього
+/// в переліку §4.8 немає. Переприсвоїти `LOAN_REJECTED` не можна: «вам відмовили»
+/// і «домовленість скасовано» — різні події, і на етапі 3 різниця поїде в текст
+/// листа та повідомлення в Telegram.
 enum NotificationType {
   LOAN_REQUESTED
   LOAN_APPROVED
   LOAN_REJECTED
+  LOAN_CANCELLED
   LOAN_HANDED_OVER
   LOAN_RETURNED
   LOAN_DUE_SOON

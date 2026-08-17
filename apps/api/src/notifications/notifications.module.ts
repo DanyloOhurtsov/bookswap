@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common'
+import { AuthModule } from '../auth/auth.module'
+import { NotificationsController } from './notifications.controller'
 import { NotificationsService } from './notifications.service'
 
 /**
- * §7. Поки що тут лише запис у таблицю: диспетчер, канали (email, Telegram),
- * ретраї й `NotificationPreference` — окремий етап (§14, етап 3). Модуль
- * заводиться зараз, бо §7.3 вимагає, щоб запис ішов у транзакції зміни стану, —
- * а перші такі зміни з'являються разом із дружбою.
+ * `AuthModule` — заради `SessionGuard` на контролері читання. Запис (`create`)
+ * гардів не потребує: його викликають інші сервіси всередині своїх транзакцій.
  */
 @Module({
+  imports: [AuthModule],
+  controllers: [NotificationsController],
   providers: [NotificationsService],
   exports: [NotificationsService],
 })

@@ -5,7 +5,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "preserve",
-    "types": ["node", "react", "react-dom"],
+    "types": ["node", "react", "react-dom", "jest"],
     "allowJs": true,
     "noEmit": true,
     "incremental": true,

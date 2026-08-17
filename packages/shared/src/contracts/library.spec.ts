@@ -21,6 +21,14 @@ const rawCopy = {
   isHome: true,
   holder: null,
   owner,
+  // §6.5: контекст позичання. `AVAILABLE` не означає «ви ще не просили» — за §5.1
+  // запит примірника не змінює, тож стан кнопки тримає саме лоан.
+  activeLoan: null,
+  myActiveLoan: null,
+  pendingRequestCount: 0,
+  // §6.5: capability рахує сервер — див. `canRequest` у контракті.
+  canRequest: true,
+  expectedReturnAt: null,
 }
 
 describe('addCopyRequestSchema', () => {
@@ -116,5 +124,85 @@ describe('проєкції примірника', () => {
     expect(parsed.owner).toEqual(owner)
     expect(parsed).not.toHaveProperty('note')
     expect(parsed).not.toHaveProperty('visibility')
+  })
+
+  it('гість бачить лише СВІЙ лоан, власник — ще й довжину черги (§6.5)', () => {
+    // Скільки ще людей просить цю книжку — справа власника: `pendingRequestCount`
+    // існує тільки в його проєкції.
+    const withLoans = {
+      ...rawCopy,
+      activeLoan: { id: 'loan-1', status: 'APPROVED', counterpart: owner },
+      myActiveLoan: { id: 'loan-2', status: 'REQUESTED' },
+      pendingRequestCount: 3,
+    }
+
+    expect(ownCopySchema.parse(withLoans).pendingRequestCount).toBe(3)
+    expect(visibleCopySchema.parse(withLoans)).not.toHaveProperty('pendingRequestCount')
+    expect(visibleCopySchema.parse(withLoans)).not.toHaveProperty('activeLoan')
+    expect(visibleCopySchema.parse(withLoans).myActiveLoan).toEqual({
+      id: 'loan-2',
+      status: 'REQUESTED',
+    })
+  })
+
+  it('ексклюзивний лоан власника не буває REQUESTED — їх може бути кілька (§5.2)', () => {
+    const withPending = {
+      ...rawCopy,
+      activeLoan: { id: 'loan-1', status: 'REQUESTED', counterpart: owner },
+    }
+
+    expect(ownCopySchema.safeParse(withPending).success).toBe(false)
+  })
+
+  it('canRequest — окреме поле, а не здогад із status (§6.5)', () => {
+    // Примірник AVAILABLE, але капабіліті може бути false: `/users/:id/library`
+    // за §9 бачить і сторонній, і власник, а запит дозволений лише другові.
+    const refused = visibleCopySchema.parse({ ...rawCopy, canRequest: false })
+
+    expect(refused.status).toBe('AVAILABLE')
+    expect(refused.canRequest).toBe(false)
+    expect(visibleCopySchema.safeParse({ ...rawCopy, canRequest: undefined }).success).toBe(false)
+  })
+
+  it('власна проєкція капабіліті не має: собі не позичають', () => {
+    expect(ownCopySchema.parse(rawCopy)).not.toHaveProperty('canRequest')
+  })
+
+  it('expectedReturnAt — дата без часу й без жодного носія особи (§6.5)', () => {
+    const lent = visibleCopySchema.parse({
+      ...rawCopy,
+      status: 'LENT_OUT',
+      isHome: false,
+      expectedReturnAt: '2026-06-12',
+    })
+
+    expect(lent.expectedReturnAt).toBe('2026-06-12')
+    // Повний ISO не приймається: «о котрій годині повернути» не домовляються.
+    expect(
+      visibleCopySchema.safeParse({ ...rawCopy, expectedReturnAt: '2026-06-12T10:00:00.000Z' })
+        .success,
+    ).toBe(false)
+  })
+
+  it('через expectedReturnAt не проходить ані лоан, ані позичальник', () => {
+    // Схема — остання лінія: навіть якщо мапер колись почне класти сюди обʼєкт,
+    // контракт його не пропустить.
+    for (const value of [
+      { loanId: 'loan-1', dueAt: '2026-06-12' },
+      { id: 'loan-1' },
+      ['2026-06-12'],
+    ]) {
+      expect(visibleCopySchema.safeParse({ ...rawCopy, expectedReturnAt: value }).success).toBe(
+        false,
+      )
+    }
+  })
+
+  it('лоан гостя не буває термінальним: історія — окремий ендпоінт', () => {
+    for (const status of ['REJECTED', 'CANCELLED', 'RETURNED', 'LOST']) {
+      expect(
+        visibleCopySchema.safeParse({ ...rawCopy, myActiveLoan: { id: 'loan-2', status } }).success,
+      ).toBe(false)
+    }
   })
 })

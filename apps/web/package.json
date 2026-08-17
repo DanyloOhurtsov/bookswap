@@ -7,6 +7,7 @@
     "dev": "next dev --port 3000",
     "start": "next start --port 3000",
     "lint": "eslint app next.config.ts --max-warnings=0",
+    "test": "jest",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "clean": "rimraf .next .turbo *.tsbuildinfo"
   },
@@ -18,12 +19,15 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "dotenv": "^17.2.3",
     "eslint-config-next": "^16.3.1",
+    "jest": "^30.4.2",
     "rimraf": "^6.0.1",
+    "ts-jest": "^29.4.12",
     "typescript": "^6.0.3"
   }
 }

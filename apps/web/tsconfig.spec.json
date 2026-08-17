@@ -1,0 +1,17 @@
+{
+  // Конфіг лише для ts-jest. Окремий, бо основний вмикає `incremental`, а це
+  // емісія `.tsbuildinfo`: у TS 6 емісія без явного `rootDir` — помилка TS5011,
+  // і «спільною текою» ts-jest щоразу вважає теку конкретного тесту.
+  //
+  // `nodenext` — бо тести бігають у голому Node, без бандлера; `bundler` з
+  // основного конфіга там не діє.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "incremental": false,
+    "rootDir": ".",
+    "types": ["node", "jest"]
+  },
+  "include": ["app/**/*.ts"]
+}

@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing'
+import { Test, type TestingModuleBuilder } from '@nestjs/testing'
 import { ThrottlerGuard } from '@nestjs/throttler'
 import type { INestApplication } from '@nestjs/common'
 import type { App } from 'supertest/types'
@@ -18,6 +18,15 @@ export interface TestAppOptions {
    * `configureApp` дивиться на NODE_ENV, а в тестах він `test` — тобто вимкнено.
    */
   trustProxy?: boolean
+  /**
+   * Підміна провайдерів перед компіляцією модуля.
+   *
+   * Потрібна рівно одному сценарію — перевірці атомарності §7.3: щоб довести, що
+   * падіння на записі сповіщення відкочує весь перехід, це падіння треба вміти
+   * влаштувати. Гачок навмисно загальний і без замовчувань: усі наявні виклики
+   * `createTestApp()` лишаються незмінними.
+   */
+  configure?: (builder: TestingModuleBuilder) => void
 }
 
 /**
@@ -27,12 +36,15 @@ export interface TestAppOptions {
 export async function createTestApp({
   withRateLimit = false,
   trustProxy = false,
+  configure,
 }: TestAppOptions = {}): Promise<INestApplication<App>> {
   const builder = Test.createTestingModule({ imports: [AppModule] })
 
   if (!withRateLimit) {
     builder.overrideGuard(ThrottlerGuard).useValue({ canActivate: () => true })
   }
+
+  configure?.(builder)
 
   const moduleRef = await builder.compile()
   const app = moduleRef.createNestApplication<INestApplication<App>>()

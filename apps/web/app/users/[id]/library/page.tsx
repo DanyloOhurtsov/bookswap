@@ -2,13 +2,20 @@
 
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, type ReactNode } from 'react'
-import type { VisibleLibraryGroup } from '@bookswap/shared'
+import { useEffect, useState, type ReactNode } from 'react'
+import {
+  createLoanRequestSchema,
+  type VisibleCopy,
+  type VisibleLibraryGroup,
+} from '@bookswap/shared'
 import { AuthorLine, EditionLine } from '../../../components/book'
+import { TextField } from '../../../components/form-field'
 import { FormStatus } from '../../../components/form-status'
-import { CONDITION_LABELS, COPY_STATUS_LABELS } from '../../../lib/labels'
+import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
+import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '../../../lib/labels'
 import { useFriendLibrary } from '../../../lib/use-library'
 import { useSession } from '../../../lib/use-session'
+import { validate, type FieldErrors } from '../../../lib/validation'
 
 /**
  * §6.5: бібліотека іншої людини.
@@ -18,23 +25,60 @@ import { useSession } from '../../../lib/use-session'
  * немає. Фільтрувати їх тут було б другою реалізацією тих самих правил, яка
  * одного дня розійдеться з першою.
  *
- * Кнопки «Попросити» тут поки немає: запит на позичання — стейт-машина §5, тобто
- * наступний етап.
+ * Кнопка «Попросити» (§5.1) дивиться на `myActiveLoan`, а НЕ на `Copy.status`:
+ * створення запиту примірника не змінює, тож після надісланого прохання книжка
+ * лишається `AVAILABLE`. Рішення за статусом дозволило б натиснути вдруге й
+ * отримати 409 — помилку, яку клієнт мав знати наперед.
  */
 export default function FriendLibraryPage() {
   const parameters = useParams<{ id: string }>()
   const router = useRouter()
-  const { state: session } = useSession()
-  const state = useFriendLibrary(parameters.id)
+  const { state: session, reload: reloadSession } = useSession()
+  const { state, reload } = useFriendLibrary(parameters.id)
+  const [failure, setFailure] = useState<unknown>()
+  const [busyKey, setBusyKey] = useState<string>()
 
   useEffect(() => {
     if (session.status === 'guest') router.replace('/login')
   }, [session.status, router])
 
+  async function requestCopy(copyId: string, body: Record<string, unknown>): Promise<void> {
+    setFailure(undefined)
+    setBusyKey(`request:${copyId}`)
+
+    try {
+      await apiRequest('/loans', { method: 'POST', body: { copyId, ...body } })
+      // `await`: доки не приїхав оновлений список із `canRequest: false`, кнопка
+      // лишається заблокованою — інакше другий клік дав би 409.
+      await reload()
+    } catch (error) {
+      setFailure(error instanceof ApiRequestError ? error : new Error(describeError(error)))
+    } finally {
+      setBusyKey(undefined)
+    }
+  }
+
   if (session.status === 'loading' || state.status === 'loading') {
     return (
       <Shell title="Бібліотека">
         <p className="status status--pending">Завантажую…</p>
+      </Shell>
+    )
+  }
+
+  // Збій перевірки сесії — це НЕ «ви не залогінені»: редирект робиться лише для
+  // `guest`. Показати тут «Переадресовую…» означало б лишити людину перед
+  // написом, який ніколи не справдиться.
+  if (session.status === 'error') {
+    return (
+      <Shell title="Бібліотека">
+        <FormStatus error={new Error(session.message)} />
+        <p className="form__aside">
+          <button type="button" onClick={reloadSession}>
+            Спробувати ще раз
+          </button>{' '}
+          · <Link href="/login">Увійти</Link>
+        </p>
       </Shell>
     )
   }
@@ -59,20 +103,27 @@ export default function FriendLibraryPage() {
   }
 
   return (
-    <Shell title={`Бібліотека: ${state.owner.displayName}`}>
-      {state.groups.length === 0 ? (
+    <Shell title={`Бібліотека: ${state.data.owner.displayName}`}>
+      <FormStatus error={failure} />
+
+      {state.data.groups.length === 0 ? (
         <p className="empty">Тут поки нічого не видно.</p>
       ) : (
         <ul className="books">
-          {state.groups.map((group) => (
-            <GroupCard key={group.edition.id} group={group} />
+          {state.data.groups.map((group) => (
+            <GroupCard
+              key={group.edition.id}
+              group={group}
+              busyKey={busyKey}
+              onRequest={requestCopy}
+            />
           ))}
         </ul>
       )}
 
       <p className="form__aside">
-        <Link href="/friends">До друзів</Link> · <Link href="/catalog">Каталог</Link> ·{' '}
-        <Link href="/library">Моя бібліотека</Link>
+        <Link href="/friends">До друзів</Link> · <Link href="/loans">Позичання</Link> ·{' '}
+        <Link href="/catalog">Каталог</Link> · <Link href="/library">Моя бібліотека</Link>
       </p>
     </Shell>
   )
@@ -87,7 +138,15 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function GroupCard({ group }: { group: VisibleLibraryGroup }) {
+function GroupCard({
+  group,
+  busyKey,
+  onRequest,
+}: {
+  group: VisibleLibraryGroup
+  busyKey: string | undefined
+  onRequest: (copyId: string, body: Record<string, unknown>) => Promise<void>
+}) {
   return (
     <li className="book">
       <Link className="book__title" href={`/works/${group.work.id}`}>
@@ -106,10 +165,162 @@ function GroupCard({ group }: { group: VisibleLibraryGroup }) {
                   інакше приїжджає null, і видно самий статус. */}
               {!copy.isHome &&
                 (copy.holder === null ? ' · зараз у когось' : ` · у ${copy.holder.displayName}`)}
+              {/* §6.5: «Для RESERVED / LENT_OUT — орієнтовна дата повернення,
+                  якщо власник її вказав». Дата приходить окремим полем і не
+                  залежить від showHolderNames: вона про книжку, а не про людину. */}
+              {copy.expectedReturnAt !== null &&
+                ` · орієнтовно вільна ${formatDate(copy.expectedReturnAt)}`}
             </span>
+
+            <CopyAction copy={copy} busyKey={busyKey} onRequest={onRequest} />
           </li>
         ))}
       </ul>
     </li>
+  )
+}
+
+/**
+ * Що можна зробити з цим примірником просто зараз.
+ *
+ * Порядок гілок значущий: **спершу власний лоан**, і лише потім статус
+ * примірника. Зворотний порядок — рівно та помилка, від якої рятує `myActiveLoan`:
+ * після надісланого запиту книжка ще `AVAILABLE`, і кнопка «Попросити»
+ * зʼявилася б удруге.
+ */
+function CopyAction({
+  copy,
+  busyKey,
+  onRequest,
+}: {
+  copy: VisibleCopy
+  busyKey: string | undefined
+  onRequest: (copyId: string, body: Record<string, unknown>) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const [proposedDueAt, setProposedDueAt] = useState('')
+  const [errors, setErrors] = useState<FieldErrors>({})
+
+  const busy = busyKey !== undefined
+
+  if (copy.myActiveLoan !== null) {
+    // Глибоке посилання веде до КОНКРЕТНОГО лоану, а не до списку, у якому його
+    // ще треба знайти. `role=borrower` — бік глядача: тут він завжди той, хто
+    // просить, бо це чужа полиця.
+    const loanHref = `/loans?loanId=${copy.myActiveLoan.id}&role=borrower`
+
+    switch (copy.myActiveLoan.status) {
+      case 'REQUESTED':
+        return (
+          <span className="book__meta">
+            Запит надіслано — чекайте на відповідь. <Link href={loanHref}>Відкрити запит</Link>
+          </span>
+        )
+      case 'APPROVED':
+        return (
+          <span className="book__meta">
+            Домовлено. Коли отримаєте книжку — підтвердьте це в{' '}
+            <Link href={loanHref}>позичанні</Link>.
+          </span>
+        )
+      case 'HANDED_OVER':
+        return (
+          <span className="book__meta">
+            Ця книжка зараз у вас. <Link href={loanHref}>Відкрити позичання</Link> ·{' '}
+            <Link href="/library">Чужі в мене</Link>
+          </span>
+        )
+    }
+  }
+
+  // §6.5 і §9: капабіліті рахує сервер. Тут навмисно НЕМА перевірки статусу,
+  // дружби чи видимості — це були б другі реалізації авторизаційних правил, до
+  // того ж без даних, потрібних, щоб відповісти правильно.
+  //
+  // Дата повернення тут не повторюється: вона вже стоїть у рядку статусу вище.
+  if (!copy.canRequest) {
+    return <span className="book__meta">Зараз попросити не можна.</span>
+  }
+
+  if (!open) {
+    return (
+      <div className="person__actions">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setOpen(true)
+          }}
+        >
+          Попросити
+        </button>
+      </div>
+    )
+  }
+
+  function submit(): void {
+    const result = validate(createLoanRequestSchema, {
+      copyId: copy.id,
+      message: message.trim() === '' ? undefined : message,
+      proposedDueAt: proposedDueAt === '' ? undefined : proposedDueAt,
+    })
+
+    if (!result.ok) {
+      setErrors(result.errors)
+      return
+    }
+
+    setErrors({})
+    void onRequest(copy.id, {
+      ...(result.data.message === undefined ? {} : { message: result.data.message }),
+      ...(result.data.proposedDueAt === undefined
+        ? {}
+        : { proposedDueAt: result.data.proposedDueAt }),
+    })
+  }
+
+  return (
+    <div className="form">
+      <TextField
+        id={`message-${copy.id}`}
+        label="Повідомлення"
+        hint="Побачить власник разом із запитом."
+        autoComplete="off"
+        value={message}
+        error={errors.message}
+        onChange={(event) => {
+          setMessage(event.target.value)
+        }}
+      />
+
+      <TextField
+        id={`due-${copy.id}`}
+        label="Хочу повернути до"
+        type="date"
+        hint="Побажання: остаточний термін встановить власник."
+        value={proposedDueAt}
+        error={errors.proposedDueAt}
+        onChange={(event) => {
+          setProposedDueAt(event.target.value)
+        }}
+      />
+
+      <div className="person__actions">
+        <button type="button" disabled={busy} onClick={submit}>
+          {busyKey === `request:${copy.id}` ? 'Надсилаю…' : 'Надіслати запит'}
+        </button>
+        <button
+          type="button"
+          className="button--ghost"
+          disabled={busy}
+          onClick={() => {
+            setOpen(false)
+          }}
+        >
+          Скасувати
+        </button>
+      </div>
+    </div>
   )
 }

@@ -33,10 +33,17 @@ export function toMe(user: UserModel): Me {
  */
 export const PUBLIC_USER_FIELDS = { id: true, displayName: true, avatarUrl: true } as const
 
+/**
+ * Рівно те, що вибирає `PUBLIC_USER_FIELDS`.
+ *
+ * Іменований тип, щоб мапери інших модулів описували вкладеного користувача ним,
+ * а не власною копією `Pick<…>`: копія переживе видалення поля з `PUBLIC_USER_FIELDS`
+ * і почне вимагати колонку, якої в запиті вже немає.
+ */
+export type PublicUserRow = Pick<UserModel, 'id' | 'displayName' | 'avatarUrl'>
+
 /** §9: «Профіль | Інший | імʼя + аватар». Ні пошти, ні налаштувань видимості. */
-export function toPublicUser(
-  user: Pick<UserModel, 'id' | 'displayName' | 'avatarUrl'>,
-): PublicUser {
+export function toPublicUser(user: PublicUserRow): PublicUser {
   return {
     id: user.id,
     displayName: user.displayName,

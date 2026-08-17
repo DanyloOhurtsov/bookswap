@@ -83,6 +83,29 @@ export async function createGraph(
 }
 
 /**
+ * Дружба `ACCEPTED` між двома людьми.
+ *
+ * Пара нормалізується тут же: §4.3 вимагає `userAId < userBId`, і CHECK
+ * `friendship_ab_ordered` цього не пробачає. Тримати ту саму сортову умову в
+ * кожному тесті означало б переписувати її на кожен новий файл.
+ */
+export async function createFriendship(
+  prisma: PrismaClient,
+  oneId: string,
+  otherId: string,
+): Promise<string> {
+  const [userAId, userBId] = [oneId, otherId].sort()
+
+  if (userAId === undefined || userBId === undefined) throw new Error('Недосяжно: пара з двох id')
+
+  const friendship = await prisma.friendship.create({
+    data: { userAId, userBId, status: 'ACCEPTED', requestedById: oneId, respondedAt: new Date() },
+  })
+
+  return friendship.id
+}
+
+/**
  * Помилки БД у тестах перевіряються за текстом, а не лише за фактом падіння:
  * інакше тест лишається зеленим, коли запит падає з зовсім іншої причини.
  */

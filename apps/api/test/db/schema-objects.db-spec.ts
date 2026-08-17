@@ -149,6 +149,53 @@ describe('обʼєкти схеми поза Prisma Schema', () => {
     expect(rows[1]?.definition).toMatch(/"blockedById" IS NULL/)
   })
 
+  it('CHECK-обмеження Loan існує (§5.3.4)', async () => {
+    const rows = await prisma.$queryRaw<{ conname: string; definition: string }[]>`
+      SELECT conname, pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid = '"Loan"'::regclass AND contype = 'c'
+      ORDER BY conname
+    `
+
+    expect(rows.map((row) => row.conname)).toEqual(['loan_borrower_not_owner'])
+    expect(rows[0]?.definition).toMatch(/"borrowerId" <> "ownerId"/)
+  })
+
+  /**
+   * §5.3.2 в ослабленій формі: три імплікації замість еквівалентності.
+   *
+   * Дослівне «AVAILABLE ⟺ holder = owner» суперечить §5.1 і §4.5 — `RESERVED` і
+   * `UNAVAILABLE` теж означають книжку вдома. Тест фіксує саме ту форму, яку ми
+   * свідомо обрали, щоб її не «виправили» назад до еквівалентності.
+   */
+  it('CHECK-обмеження Copy тримають інваріант §5.3.2 трьома імплікаціями', async () => {
+    const rows = await prisma.$queryRaw<{ conname: string; definition: string }[]>`
+      SELECT conname, pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid = '"Copy"'::regclass AND contype = 'c'
+      ORDER BY conname
+    `
+
+    expect(rows.map((row) => row.conname)).toEqual([
+      'copy_available_is_home',
+      'copy_away_is_lent_or_unavailable',
+      'copy_lent_out_is_away',
+    ])
+
+    // 1. Вільна книжка завжди вдома.
+    expect(rows[0]?.definition).toMatch(/AVAILABLE/)
+    expect(rows[0]?.definition).toMatch(/"currentHolderId" = "ownerId"/)
+
+    // 2. Не вдома — лише LENT_OUT або UNAVAILABLE. RESERVED сюди не входить, тож
+    //    «домовлено» автоматично означає «ще вдома» (§5.2).
+    expect(rows[1]?.definition).toMatch(/LENT_OUT/)
+    expect(rows[1]?.definition).toMatch(/UNAVAILABLE/)
+    expect(rows[1]?.definition).not.toMatch(/RESERVED/)
+
+    // 3. Зворотний бік: LENT_OUT означає, що книжка фізично в іншої людини.
+    expect(rows[2]?.definition).toMatch(/"currentHolderId" <> "ownerId"/)
+  })
+
   it('blockedById має зовнішній ключ на User — від нього залежить право (§6.2)', async () => {
     const rows = await prisma.$queryRaw<{ definition: string }[]>`
       SELECT pg_get_constraintdef(oid) AS definition

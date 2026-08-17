@@ -1,0 +1,111 @@
+import type { HistoryCopy, HistoryEntry, NamedHistoryEntry } from '@bookswap/shared'
+import {
+  toEdition,
+  toWork,
+  toWorkAuthors,
+  type EditionRow,
+  type WorkAuthorRow,
+  type WorkRow,
+} from '../catalog/catalog.mapper'
+import { isOverdue, toIsoDay } from '../loans/loan.mapper'
+import { toPublicUser, type PublicUserRow } from '../users/user.mapper'
+import type { CopyModel, LoanModel } from '../generated/prisma/models'
+
+/**
+ * §6.6: історія виводиться з `Loan` — окремих таблиць немає (§4.6).
+ *
+ * Проєкцій дві, і це та сама вимога, що вже дала три проєкції `Copy`: §9 каже, що
+ * приватне не повинно **віддаватися з API**, а не ховатися в UI. Єдиний надійний
+ * спосіб це гарантувати — щоб полів з іменами у відповідній функції не існувало
+ * взагалі.
+ *
+ * Одна функція з прапорцем `showNames` виглядала б коротшою й була б гіршою:
+ * досить забути занулити одне вкладене поле — і ім'я поїде тому, кому §6.6 його
+ * не обіцяла. Тут забути нічого: `toAnonymousEntry` фізично не має доступу до
+ * користувачів, бо не приймає їх у результат.
+ *
+ * `showNames` вирішує не цей файл, а `holderNamesVisibleTo` зі §9 — сюди приїжджає
+ * вже готова відповідь.
+ */
+
+export type HistoryLoanRow = Pick<
+  LoanModel,
+  'id' | 'status' | 'requestedAt' | 'respondedAt' | 'handedAt' | 'returnedAt' | 'dueAt'
+> & {
+  owner: PublicUserRow
+  borrower: PublicUserRow
+}
+
+export type HistoryCopyRow = Pick<CopyModel, 'id' | 'status' | 'condition'> & {
+  edition: EditionRow & { work: WorkRow & { authors: WorkAuthorRow[] } }
+}
+
+/** Самі факти: статуси й дати. Жодного носія особи. */
+function factsOf(
+  loan: HistoryLoanRow,
+  now: Date,
+): Omit<NamedHistoryEntry, 'names' | 'loanId' | 'owner' | 'borrower'> {
+  return {
+    status: loan.status,
+    isOverdue: isOverdue(loan, now),
+    requestedAt: loan.requestedAt.toISOString(),
+    respondedAt: loan.respondedAt?.toISOString() ?? null,
+    handedAt: loan.handedAt?.toISOString() ?? null,
+    returnedAt: loan.returnedAt?.toISOString() ?? null,
+    dueAt: toIsoDay(loan.dueAt),
+  }
+}
+
+/** §6.6: власнику завжди, другові — за `showHolderNames`. */
+export function toNamedEntry(loan: HistoryLoanRow, now: Date = new Date()): NamedHistoryEntry {
+  return {
+    ...factsOf(loan, now),
+    names: true,
+    loanId: loan.id,
+    owner: toPublicUser(loan.owner),
+    borrower: toPublicUser(loan.borrower),
+  }
+}
+
+/**
+ * §6.6: «у когось до 12 червня».
+ *
+ * `loanId` теж не віддається. Дій над чужим лоаном немає (`GET /loans/:id`
+ * відповість 404), тож id був би рівно тим ідентифікатором, за яким два різні
+ * зрізи анонімної історії склеюються в одну людину.
+ */
+export function toAnonymousEntry(loan: HistoryLoanRow, now: Date = new Date()): HistoryEntry {
+  return { ...factsOf(loan, now), names: false }
+}
+
+export function toHistoryEntry(
+  loan: HistoryLoanRow,
+  showNames: boolean,
+  now: Date = new Date(),
+): HistoryEntry {
+  return showNames ? toNamedEntry(loan, now) : toAnonymousEntry(loan, now)
+}
+
+/**
+ * Примірник у контексті історії.
+ *
+ * Ані `ownerId`, ані `currentHolderId`, ані вкладеного власника — та сама вимога
+ * §6.6, застосована до обгортки. Чия це полиця, викликач знає зі сторінки, з якої
+ * прийшов; id у тілі відповіді був би каналом витоку рівно тоді, коли імена
+ * приховані.
+ */
+export function toHistoryCopy(copy: HistoryCopyRow): HistoryCopy {
+  return {
+    id: copy.id,
+    status: copy.status,
+    condition: copy.condition,
+    edition: toEdition(copy.edition, copy.edition.work),
+    work: toWork(copy.edition.work),
+    authors: toWorkAuthors(copy.edition.work.authors),
+  }
+}
+
+/** Хронологія §6.6: від найдавнішого запиту до найновішого. */
+export function byRequestedAt(one: HistoryLoanRow, other: HistoryLoanRow): number {
+  return one.requestedAt.getTime() - other.requestedAt.getTime() || one.id.localeCompare(other.id)
+}

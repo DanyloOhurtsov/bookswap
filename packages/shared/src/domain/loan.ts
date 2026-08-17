@@ -1,0 +1,89 @@
+import { z } from 'zod'
+
+/**
+ * §4.6, enum `LoanStatus`.
+ *
+ * Значення дублюють Prisma-enum з `apps/api` — причина та сама, що в
+ * `domain/visibility.ts`: `packages/shared` не має права залежати від
+ * згенерованого клієнта (§12.1). Розсинхрон ловить `enum-parity.spec.ts`.
+ *
+ * `OVERDUE` тут немає навмисно (§5.2): прострочення виводиться як
+ * `status = HANDED_OVER AND dueAt < now()`. Окремий статус довелося б проставляти
+ * по крону, і він завжди відставав би від реальності.
+ */
+export const LOAN_STATUS = [
+  'REQUESTED',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'HANDED_OVER',
+  'RETURNED',
+  'LOST',
+] as const
+
+export const loanStatusSchema = z.enum(LOAN_STATUS)
+
+export type LoanStatus = z.infer<typeof loanStatusSchema>
+
+/**
+ * Статуси, за яких лоан ще «відкритий»: він або чекає на відповідь, або вже щось
+ * означає для примірника. Решта чотири термінальні.
+ *
+ * Окремий список, а не звуження `LOAN_STATUS` фільтром — він виражає інше
+ * питання: не «які статуси бувають», а «чи є зараз між цією людиною й цим
+ * примірником щось незавершене». Ним користується §6.5: кнопка «Попросити» не
+ * може вирішувати за `Copy.status`, бо `REQUESTED` примірника не змінює.
+ */
+export const OPEN_LOAN_STATUS = ['REQUESTED', 'APPROVED', 'HANDED_OVER'] as const
+
+export const openLoanStatusSchema = z.enum(OPEN_LOAN_STATUS)
+
+export type OpenLoanStatus = z.infer<typeof openLoanStatusSchema>
+
+/**
+ * Статуси, за яких лоан займає примірник **ексклюзивно**.
+ *
+ * Рівно та множина, яку тримає частковий унікальний індекс
+ * `one_active_loan_per_copy` (§5.3.1), тож такий лоан на примірнику завжди
+ * не більше одного. `REQUESTED` сюди не входить: §5.2 навмисно дозволяє кільком
+ * людям одночасно мати запит на той самий примірник.
+ *
+ * Це ж та множина, що блокує видалення примірника й зміну його статусу (§5.2).
+ */
+export const EXCLUSIVE_LOAN_STATUS = ['APPROVED', 'HANDED_OVER'] as const
+
+export const exclusiveLoanStatusSchema = z.enum(EXCLUSIVE_LOAN_STATUS)
+
+export type ExclusiveLoanStatus = z.infer<typeof exclusiveLoanStatusSchema>
+
+/**
+ * §8: `PATCH /loans/:id { action }` — один ендпоінт замість шести.
+ *
+ * Прецедент і мотивація ті самі, що у `FRIEND_REQUEST_ACTIONS`: усі переходи
+ * проходять крізь одну точку, де живе валідація стейт-машини. Назви — з §8
+ * буквально, у snake_case, бо це значення протоколу, а не імена методів.
+ */
+export const LOAN_ACTIONS = [
+  'approve',
+  'reject',
+  'cancel',
+  'hand_over',
+  'return',
+  'mark_lost',
+] as const
+
+export const loanActionSchema = z.enum(LOAN_ACTIONS)
+
+export type LoanAction = z.infer<typeof loanActionSchema>
+
+/**
+ * §8: `GET /loans?role=owner|borrower`.
+ *
+ * Це не роль у системі, а бік конкретного лоану: та сама людина одночасно
+ * власник в одних лоанах і позичальник в інших, тож фільтр мусить бути явним.
+ */
+export const LOAN_ROLES = ['owner', 'borrower'] as const
+
+export const loanRoleSchema = z.enum(LOAN_ROLES)
+
+export type LoanRole = z.infer<typeof loanRoleSchema>

@@ -24,7 +24,7 @@ import { SelectField, TextField } from '../components/form-field'
 import { FormStatus } from '../components/form-status'
 import { ApiRequestError, apiRequest, describeError } from '../lib/api'
 import { CONDITION_LABELS, COPY_STATUS_LABELS, VISIBILITY_LABELS, formatDate } from '../lib/labels'
-import { useLibrary, type LibraryView } from '../lib/use-library'
+import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../lib/use-library'
 import { useSession } from '../lib/use-session'
 import { validate, type FieldErrors } from '../lib/validation'
 
@@ -87,6 +87,63 @@ const VIEW_LABELS: Readonly<Record<LibraryView, string>> = {
 
 function LibraryScreen() {
   const [view, setView] = useState<LibraryView>('own')
+
+  return (
+    <Shell>
+      <nav className="actions" aria-label="Вигляд бібліотеки">
+        {(['own', 'out', 'borrowed'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={view === value ? undefined : 'button--ghost'}
+            aria-pressed={view === value}
+            onClick={() => {
+              setView(value)
+            }}
+          >
+            {VIEW_LABELS[value]}
+          </button>
+        ))}
+      </nav>
+
+      {/* Два різні в'ю — два різні компоненти з власними хуками. «Чужі в мене»
+          віддає інший тип примірника й не має жодної мутації, тож спільний стан
+          із фільтрами й `busyKey` їм не потрібен. */}
+      {view === 'borrowed' ? <BorrowedView /> : <OwnView view={view} />}
+
+      <p className="form__aside">
+        <Link href="/catalog">Додати книжку</Link> · <Link href="/loans">Позичання</Link> ·{' '}
+        <Link href="/history">Історія</Link> · <Link href="/friends">Друзі</Link> ·{' '}
+        <Link href="/">На головну</Link>
+      </p>
+    </Shell>
+  )
+}
+
+function BorrowedView() {
+  const { state } = useBorrowedLibrary()
+
+  return (
+    <>
+      {state.status === 'loading' && <p className="status status--pending">Завантажую полицю…</p>}
+      {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
+
+      {state.status === 'ready' && state.data.groups.length === 0 && (
+        <p className="empty">{emptyMessage('borrowed')}</p>
+      )}
+
+      {state.status === 'ready' && (
+        <ul className="books">
+          {state.data.groups.map((group) => (
+            <BorrowedGroupCard key={group.edition.id} group={group} />
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
+function OwnView({ view }: { view: 'own' | 'out' }) {
   const [filters, setFilters] = useState<LibraryQueryRequest>({})
   const [statusFilter, setStatusFilter] = useState('')
   const [langFilter, setLangFilter] = useState('')
@@ -96,7 +153,7 @@ function LibraryScreen() {
   const [busyKey, setBusyKey] = useState<string>()
   const [pendingDelete, setPendingDelete] = useState<OwnCopy>()
 
-  const { state, reload } = useLibrary(view, filters)
+  const { state, reload } = useOwnLibrary(view, filters)
 
   function applyFilters(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
@@ -122,7 +179,8 @@ function LibraryScreen() {
 
     try {
       await action()
-      reload()
+      // `await`: доки не приїхав новий список, кнопки лишаються заблокованими.
+      await reload()
     } catch (error) {
       setFailure(error instanceof ApiRequestError ? error : new Error(describeError(error)))
     } finally {
@@ -137,22 +195,7 @@ function LibraryScreen() {
     })
 
   return (
-    <Shell>
-      <nav className="actions" aria-label="Вигляд бібліотеки">
-        {(['own', 'out', 'borrowed'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={view === value ? undefined : 'button--ghost'}
-            onClick={() => {
-              setView(value)
-            }}
-          >
-            {VIEW_LABELS[value]}
-          </button>
-        ))}
-      </nav>
-
+    <>
       {view === 'own' && (
         <form className="search" onSubmit={applyFilters} noValidate>
           <SelectField
@@ -203,21 +246,13 @@ function LibraryScreen() {
       {state.status === 'loading' && <p className="status status--pending">Завантажую полицю…</p>}
       {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
 
-      {state.status === 'ready' && state.groups.length === 0 && (
+      {state.status === 'ready' && state.data.groups.length === 0 && (
         <p className="empty">{emptyMessage(view)}</p>
       )}
 
-      {state.status === 'ready' && state.view === 'borrowed' && (
+      {state.status === 'ready' && (
         <ul className="books">
-          {state.groups.map((group) => (
-            <BorrowedGroupCard key={group.edition.id} group={group} />
-          ))}
-        </ul>
-      )}
-
-      {state.status === 'ready' && state.view !== 'borrowed' && (
-        <ul className="books">
-          {state.groups.map((group) => (
+          {state.data.groups.map((group) => (
             <OwnGroupCard
               key={group.edition.id}
               group={group}
@@ -233,7 +268,7 @@ function LibraryScreen() {
       <ConfirmDialog
         open={pendingDelete !== undefined}
         title="Видалити примірник?"
-        description="Запис зникне з вашої бібліотеки разом із нотаткою. Історію позичань це не чіпає — примірник із активним позичанням видалити не можна."
+        description="Запис зникне з вашої бібліотеки разом із нотаткою — і разом з усією історією позичань цього примірника: і завершеними, і тими, що чекають на відповідь. Відновити її не можна. Примірник із підтвердженим або переданим позичанням видалити неможливо — спершу скасуйте або завершіть позичання."
         confirmLabel="Видалити"
         pending={busyKey !== undefined}
         onConfirm={() => {
@@ -243,12 +278,7 @@ function LibraryScreen() {
           setPendingDelete(undefined)
         }}
       />
-
-      <p className="form__aside">
-        <Link href="/catalog">Додати книжку</Link> · <Link href="/friends">Друзі</Link> ·{' '}
-        <Link href="/">На головну</Link>
-      </p>
-    </Shell>
+    </>
   )
 }
 
@@ -287,6 +317,18 @@ function BorrowedGroupCard({ group }: { group: BorrowedLibraryGroup }) {
             <span className="book__meta">
               {CONDITION_LABELS[copy.condition]} · власник: {copy.owner.displayName}
             </span>
+            <span className="book__meta">
+              {/* Джерело id явне: це лоан, яким книжка сюди потрапила, а не
+                  «якийсь активний». Питання «де мій примірник» і «хто його
+                  просить» мають різні відповіді (§5.2, §5.3.1). */}
+              {copy.activeLoan !== null && (
+                <Link href={`/loans?loanId=${copy.activeLoan.id}&role=borrower`}>
+                  Моє позичання
+                </Link>
+              )}
+              {copy.activeLoan !== null && ' · '}
+              <Link href={`/copies/${copy.id}/history`}>Історія</Link>
+            </span>
           </li>
         ))}
       </ul>
@@ -303,7 +345,7 @@ function OwnGroupCard({
 }: {
   group: LibraryGroup
   busyKey: string | undefined
-  onSaved: () => void
+  onSaved: () => Promise<void>
   onFailure: (error: unknown) => void
   onDelete: (copy: OwnCopy) => void
 }) {
@@ -337,7 +379,7 @@ function CopyRow({
 }: {
   copy: OwnCopy
   busyKey: string | undefined
-  onSaved: () => void
+  onSaved: () => Promise<void>
   onFailure: (error: unknown) => void
   onDelete: () => void
 }) {
@@ -382,7 +424,7 @@ function CopyRow({
       })
 
       setOpen(false)
-      onSaved()
+      await onSaved()
     } catch (error) {
       onFailure(error instanceof ApiRequestError ? error : new Error(describeError(error)))
     } finally {
@@ -400,7 +442,7 @@ function CopyRow({
         schema: copyResponseSchema,
       })
 
-      onSaved()
+      await onSaved()
     } catch (error) {
       onFailure(error instanceof ApiRequestError ? error : new Error(describeError(error)))
     } finally {
@@ -417,6 +459,27 @@ function CopyRow({
         {copy.acquiredAt !== null && ` · відтоді: ${formatDate(copy.acquiredAt)}`}
       </span>
       {copy.note !== null && <span className="book__meta">Нотатка: {copy.note}</span>}
+
+      <span className="book__meta">
+        {/* Два різні питання — два різні джерела. `activeLoan` — єдина
+            домовленість, що займає книжку (§5.3.1); `pendingRequestCount` —
+            скільки людей чекає у черзі, а їх §5.2 дозволяє кілька. Один
+            «activeLoanId» на обидва випадки відповідав би не на те. */}
+        {copy.activeLoan !== null && (
+          <>
+            <Link href={`/loans?loanId=${copy.activeLoan.id}&role=owner`}>
+              Позичання: {copy.activeLoan.counterpart.displayName}
+            </Link>{' '}
+            ·{' '}
+          </>
+        )}
+        {copy.pendingRequestCount > 0 && (
+          <>
+            <Link href="/loans?role=owner">Запитів: {copy.pendingRequestCount}</Link> ·{' '}
+          </>
+        )}
+        <Link href={`/copies/${copy.id}/history`}>Історія</Link>
+      </span>
 
       {open ? (
         <div className="form">

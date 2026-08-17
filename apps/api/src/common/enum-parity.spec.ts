@@ -3,7 +3,11 @@ import {
   CONDITION,
   COPY_STATUS,
   EDITION_FORMAT,
+  EXCLUSIVE_LOAN_STATUS,
   FRIENDSHIP_STATUS,
+  LOAN_STATUS,
+  NOTIFICATION_TYPE,
+  OPEN_LOAN_STATUS,
   OWNER_COPY_STATUS,
   VISIBILITY,
 } from '@bookswap/shared'
@@ -13,6 +17,8 @@ import type {
   CopyStatus as SharedCopyStatus,
   EditionFormat as SharedEditionFormat,
   FriendshipStatus as SharedFriendshipStatus,
+  LoanStatus as SharedLoanStatus,
+  NotificationType as SharedNotificationType,
   Visibility as SharedVisibility,
 } from '@bookswap/shared'
 import {
@@ -21,6 +27,8 @@ import {
   CopyStatus as PrismaCopyStatus,
   EditionFormat as PrismaEditionFormat,
   FriendshipStatus as PrismaFriendshipStatus,
+  LoanStatus as PrismaLoanStatus,
+  NotificationType as PrismaNotificationType,
   Visibility as PrismaVisibility,
 } from '../generated/prisma/enums'
 import type {
@@ -29,6 +37,8 @@ import type {
   CopyStatus as PrismaCopyStatusType,
   EditionFormat as PrismaEditionFormatType,
   FriendshipStatus as PrismaFriendshipStatusType,
+  LoanStatus as PrismaLoanStatusType,
+  NotificationType as PrismaNotificationTypeType,
   Visibility as PrismaVisibilityType,
 } from '../generated/prisma/enums'
 
@@ -46,6 +56,8 @@ const _authorRoleMatches: Equal<SharedAuthorRole, PrismaAuthorRoleType> = true
 const _editionFormatMatches: Equal<SharedEditionFormat, PrismaEditionFormatType> = true
 const _copyStatusMatches: Equal<SharedCopyStatus, PrismaCopyStatusType> = true
 const _conditionMatches: Equal<SharedCondition, PrismaConditionType> = true
+const _loanStatusMatches: Equal<SharedLoanStatus, PrismaLoanStatusType> = true
+const _notificationTypeMatches: Equal<SharedNotificationType, PrismaNotificationTypeType> = true
 
 describe('Visibility: shared ↔ Prisma', () => {
   it('містить ті самі значення', () => {
@@ -142,5 +154,96 @@ describe('Condition: shared ↔ Prisma', () => {
 
   it('відповідає §4.5', () => {
     expect([...CONDITION].sort()).toEqual(['DAMAGED', 'GOOD', 'NEW', 'WORN'])
+  })
+})
+
+describe('LoanStatus: shared ↔ Prisma', () => {
+  it('містить ті самі значення', () => {
+    expect([...LOAN_STATUS].sort()).toEqual(Object.values(PrismaLoanStatus).sort())
+  })
+
+  it('типи взаємно присвоювані', () => {
+    expect(_loanStatusMatches).toBe(true)
+  })
+
+  it('відповідає §4.6', () => {
+    expect([...LOAN_STATUS].sort()).toEqual([
+      'APPROVED',
+      'CANCELLED',
+      'HANDED_OVER',
+      'LOST',
+      'REJECTED',
+      'REQUESTED',
+      'RETURNED',
+    ])
+  })
+
+  /**
+   * §5.2: «`OVERDUE` — не статус». Прострочення виводиться як
+   * `status = HANDED_OVER AND dueAt < now()`. Окремий статус довелося б проставляти
+   * по крону, і він завжди відставав би — тому його немає ні в Prisma, ні в shared,
+   * і тест стежить, щоб не зʼявився.
+   */
+  it('OVERDUE немає — це похідний прапорець, а не статус', () => {
+    expect([...LOAN_STATUS]).not.toContain('OVERDUE')
+    expect(Object.values(PrismaLoanStatus)).not.toContain('OVERDUE')
+  })
+
+  /**
+   * Ці два списки — не дзеркала Prisma-enum, а відповіді на інші питання:
+   * «чи є щось незавершене» і «чи займає книжку ексклюзивно». Другий мусить
+   * збігатися з множиною часткового унікального індексу §5.3.1.
+   */
+  it('незавершені й ексклюзивні статуси лишаються підмножинами §4.6', () => {
+    expect([...OPEN_LOAN_STATUS].sort()).toEqual(['APPROVED', 'HANDED_OVER', 'REQUESTED'])
+    expect([...EXCLUSIVE_LOAN_STATUS].sort()).toEqual(['APPROVED', 'HANDED_OVER'])
+
+    for (const status of OPEN_LOAN_STATUS) {
+      expect(Object.values(PrismaLoanStatus)).toContain(status)
+    }
+  })
+
+  it('ексклюзивні — саме ті, що тримає one_active_loan_per_copy (§5.3.1)', () => {
+    for (const status of EXCLUSIVE_LOAN_STATUS) {
+      expect(OPEN_LOAN_STATUS).toContain(status)
+    }
+
+    expect([...EXCLUSIVE_LOAN_STATUS]).not.toContain('REQUESTED')
+  })
+})
+
+describe('NotificationType: shared ↔ Prisma', () => {
+  it('містить ті самі значення', () => {
+    expect([...NOTIFICATION_TYPE].sort()).toEqual(Object.values(PrismaNotificationType).sort())
+  })
+
+  it('типи взаємно присвоювані', () => {
+    expect(_notificationTypeMatches).toBe(true)
+  })
+
+  it('містить усі типи §4.8', () => {
+    for (const type of [
+      'LOAN_REQUESTED',
+      'LOAN_APPROVED',
+      'LOAN_REJECTED',
+      'LOAN_HANDED_OVER',
+      'LOAN_RETURNED',
+      'LOAN_DUE_SOON',
+      'LOAN_OVERDUE',
+      'FRIEND_REQUESTED',
+      'FRIEND_ACCEPTED',
+    ]) {
+      expect([...NOTIFICATION_TYPE]).toContain(type)
+    }
+  })
+
+  /**
+   * Свідоме доповнення до §4.8: §5.1 для `APPROVED → CANCELLED` вимагає
+   * «сповіщення другій стороні», а типу під нього в переліку немає. Деталі — в
+   * README; тест фіксує, що доповнення є з обох боків.
+   */
+  it('LOAN_CANCELLED присутній і в shared, і в Prisma', () => {
+    expect([...NOTIFICATION_TYPE]).toContain('LOAN_CANCELLED')
+    expect(Object.values(PrismaNotificationType)).toContain('LOAN_CANCELLED')
   })
 })
