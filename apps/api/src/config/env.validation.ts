@@ -55,6 +55,17 @@ export const envSchema = z
      * зупиняє старт.
      */
     EMAIL_PROVIDER: z.enum(['dev', 'resend']).default('dev'),
+    /**
+     * §11, R2: ліміт на створення Work/Translation/Edition і його вікно.
+     * Дефолти дублюють фолбек у rate-limit.config.ts — схема тут для того,
+     * щоб криве значення падало на старті, а не тихо ставало дефолтом.
+     */
+    CATALOG_WRITE_RATE_LIMIT: z.coerce.number().int().positive().default(30),
+    CATALOG_WRITE_RATE_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60 * 60_000),
     /** Ключ Resend. Обов'язковий лише для `EMAIL_PROVIDER=resend` — див. superRefine. */
     RESEND_API_KEY: z.string().min(1).optional(),
     /** Відправник у форматі `Name <address@domain>` або просто адреси. */

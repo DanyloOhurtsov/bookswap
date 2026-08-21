@@ -159,3 +159,5 @@ Definition of done:
 
 - clock monotonicity у ShutdownBudget (P3, з етапу 6) — окремий коміт
 - transactional outbox / атомарніший auth-workflow (межа, зафіксована в README на етапі 6)
+- rate limiting не рахує запити, що падають на валідації DTO (виявлено при перевірці 7a)
+  — перевірити порядок гардів і покрити тестом

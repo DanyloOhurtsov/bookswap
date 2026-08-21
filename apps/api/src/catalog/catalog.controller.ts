@@ -20,6 +20,7 @@ import type {
 } from '@bookswap/shared'
 import { CurrentUser } from '../auth/authenticated-request'
 import { SessionGuard } from '../auth/session.guard'
+import { CATALOG_WRITE_RATE_LIMIT, CATALOG_WRITE_RATE_WINDOW_MS } from '../common/rate-limit.config'
 import { CatalogService } from './catalog.service'
 import {
   CatalogSearchDto,
@@ -33,8 +34,14 @@ import type { UserModel } from '../generated/prisma/models'
  * §11: rate limiting саме на створення `Work` / `Edition` — це антиспам каталогу.
  * Каталог спільний, тож зіпсувати його може будь-хто автентифікований (§6.3), і
  * єдине, що стоїть між базою і скриптом, — цей ліміт.
+ *
+ * Значення конфігуруються через env (`CATALOG_WRITE_RATE_LIMIT` /
+ * `CATALOG_WRITE_RATE_WINDOW_MS`, дефолти в `.env.example`) — див.
+ * `common/rate-limit.config.ts` про те, чому вони функції, а не числа.
  */
-const CATALOG_WRITE_LIMIT = { auth: { limit: 30, ttl: 60 * 60_000 } }
+const CATALOG_WRITE_LIMIT = {
+  auth: { limit: CATALOG_WRITE_RATE_LIMIT, ttl: CATALOG_WRITE_RATE_WINDOW_MS },
+}
 
 /** Перебір бази триграмами дорожчий за звичайний запит — стримуємо як пошук людей. */
 const CATALOG_SEARCH_LIMIT = { auth: { limit: 60, ttl: 60_000 } }

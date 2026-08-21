@@ -53,6 +53,8 @@ describe('validateEnv', () => {
       DIRECT_DATABASE_URL: DB_URL,
       // §7.2: свіжий клон працює без жодного зовнішнього провайдера.
       EMAIL_PROVIDER: 'dev',
+      CATALOG_WRITE_RATE_LIMIT: 30,
+      CATALOG_WRITE_RATE_WINDOW_MS: 3600000,
     })
   })
 })
