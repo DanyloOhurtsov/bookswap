@@ -9,9 +9,12 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // Компонентні тести (Етап 7d) рендерять JSX через ts-jest, а не next-пайплайн:
+    // `preserve` з основного конфіга там лишив би JSX нескомпільованим.
+    "jsx": "react-jsx",
     "incremental": false,
     "rootDir": ".",
-    "types": ["node", "jest"]
+    "types": ["node", "jest", "@testing-library/jest-dom"]
   },
-  "include": ["app/**/*.ts"]
+  "include": ["app/**/*.ts", "app/**/*.tsx"]
 }
