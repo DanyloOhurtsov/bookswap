@@ -8,6 +8,7 @@ import {
   apiErrorSchema,
   sessionResponseSchema,
 } from '@bookswap/shared'
+import { AuthService } from '../src/auth/auth.service'
 import { DevEmailSender } from '../src/email/dev-email-sender'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { hashToken } from '../src/auth/tokens'
@@ -24,11 +25,13 @@ describe('Auth (e2e)', () => {
   let app: INestApplication<App>
   let prisma: PrismaService
   let email: DevEmailSender
+  let auth: AuthService
 
   beforeAll(async () => {
     app = await createTestApp()
     prisma = app.get(PrismaService)
     email = app.get(DevEmailSender)
+    auth = app.get(AuthService)
   })
 
   afterAll(async () => {
@@ -36,6 +39,15 @@ describe('Auth (e2e)', () => {
   })
 
   const url = (path: string): string => `${API_PREFIX}${path}`
+
+  /**
+   * `requestPasswordReset()` тепер лише реєструє фонове завдання й
+   * повертається одразу (§6.1/дефект 8 другого раунду аудиту): лист із
+   * токеном ще не гарантовано в `DevEmailSender` в момент, коли HTTP-
+   * відповідь уже прийшла. Тести, яким потрібен сам токен, чекають завдання
+   * цим гаком — тим самим, яким користується `onModuleDestroy`.
+   */
+  const settle = async (): Promise<void> => auth.drainBackgroundWork()
 
   async function register(
     address = uniqueEmail(),
@@ -334,6 +346,7 @@ describe('Auth (e2e)', () => {
         .post(url('/auth/password-reset'))
         .send({ email: address })
         .expect(202)
+      await settle()
 
       const token = tokenFromLastEmail(email, address)
       const newPassword = 'zovsim-inshyj-parol-2026'
@@ -369,6 +382,7 @@ describe('Auth (e2e)', () => {
         .post(url('/auth/password-reset'))
         .send({ email: address })
         .expect(202)
+      await settle()
 
       await request(app.getHttpServer())
         .post(url('/auth/password-reset/confirm'))
@@ -386,12 +400,14 @@ describe('Auth (e2e)', () => {
         .post(url('/auth/password-reset'))
         .send({ email: address })
         .expect(202)
+      await settle()
       const first = tokenFromLastEmail(email, address)
 
       await request(app.getHttpServer())
         .post(url('/auth/password-reset'))
         .send({ email: address })
         .expect(202)
+      await settle()
       const second = tokenFromLastEmail(email, address)
 
       expect(first).not.toBe(second)
@@ -416,6 +432,7 @@ describe('Auth (e2e)', () => {
         .post(url('/auth/password-reset'))
         .send({ email: address })
         .expect(202)
+      await settle()
 
       await request(app.getHttpServer())
         .post(url('/auth/password-reset/confirm'))

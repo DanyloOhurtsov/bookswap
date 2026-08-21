@@ -160,6 +160,20 @@ export class FriendsService {
     target: FriendshipTarget,
     action: FriendshipAction,
   ): Promise<FriendRelation> {
+    const relation = await this.runWithRetry(actorId, target, action)
+
+    // §7.3: «після коміту: подія». Тут, а не всередині транзакції: поштовх,
+    // надісланий звідти, розбудив би диспетчер на рядки, яких ще не видно.
+    this.notifications.dispatchSoon()
+
+    return relation
+  }
+
+  private async runWithRetry(
+    actorId: string,
+    target: FriendshipTarget,
+    action: FriendshipAction,
+  ): Promise<FriendRelation> {
     try {
       return await this.runTransition(actorId, target, action)
     } catch (error) {
@@ -167,7 +181,7 @@ export class FriendsService {
 
       this.logger.log(`Гонка на створенні пари для ${actorId} — повтор переходу ${action}`)
 
-      return this.runTransition(actorId, target, action)
+      return await this.runTransition(actorId, target, action)
     }
   }
 

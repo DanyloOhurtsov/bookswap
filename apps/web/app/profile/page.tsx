@@ -243,6 +243,9 @@ function ProfileForm({ user, onUpdated }: { user: Me; onUpdated: (user: Me) => v
       </form>
 
       <p className="form__aside">
+        {/* §6.1 називає підключення Telegram і налаштування сповіщень частиною
+            профілю; сама сторінка окрема, бо матриця §7.6 більша за решту форми. */}
+        <Link href="/notifications/settings">Сповіщення й Telegram</Link> ·{' '}
         <Link href="/friends">Друзі</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
         <button type="button" className="button--link" onClick={() => void logout()}>
           Вийти

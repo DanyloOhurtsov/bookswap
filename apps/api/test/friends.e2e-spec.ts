@@ -626,7 +626,16 @@ describe('Дружба (e2e)', () => {
       expect(await prisma.notification.count({ where: { userId: oles.id } })).toBe(1)
     })
 
-    it('NotificationDelivery не створюється — диспетчер це окремий етап', async () => {
+    /**
+     * §7.3, правило 1: рядки доставки лягають у ТІЙ САМІЙ транзакції, що й подія.
+     *
+     * Раніше тут перевірялося протилежне — що доставок немає, — і це було чесно
+     * рівно доти, доки не існувало диспетчера: рядок `PENDING`, який ніхто не
+     * забирає, брехав би про стан черги. Тепер диспетчер є, і перевіряється те, що
+     * прийшло на зміну: подія без доставок недосяжна для жодного каналу, тож
+     * порожній набір означав би мовчазну втрату сповіщення.
+     */
+    it('кожна подія одразу отримує рядки доставки (§7.3)', async () => {
       const [marta, oles] = await pair()
 
       await befriend(marta, oles)
@@ -637,11 +646,18 @@ describe('Дружба (e2e)', () => {
       })
 
       expect(notifications.length).toBeGreaterThan(0)
-      expect(
-        await prisma.notificationDelivery.count({
-          where: { notificationId: { in: notifications.map((item) => item.id) } },
-        }),
-      ).toBe(0)
+
+      for (const notification of notifications) {
+        const deliveries = await prisma.notificationDelivery.findMany({
+          where: { notificationId: notification.id },
+          select: { channel: true },
+        })
+
+        // IN_APP завжди; EMAIL — за дефолтом §7.6 для FRIEND_REQUESTED.
+        // TELEGRAM не створюється: у цих акаунтів немає `chat_id`.
+        expect(deliveries.map((delivery) => delivery.channel)).toContain('IN_APP')
+        expect(deliveries.map((delivery) => delivery.channel)).not.toContain('TELEGRAM')
+      }
     })
 
     it('відкинутий перехід не лишає сповіщення — запис справді в транзакції', async () => {

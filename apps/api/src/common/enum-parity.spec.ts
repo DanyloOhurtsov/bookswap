@@ -1,20 +1,27 @@
 import {
   AUTHOR_ROLE,
+  CHANNEL,
   CONDITION,
   COPY_STATUS,
+  DELIVERY_STATUS,
+  DIGEST_NOTIFICATION_TYPE,
   EDITION_FORMAT,
   EXCLUSIVE_LOAN_STATUS,
   FRIENDSHIP_STATUS,
+  IMMEDIATE_NOTIFICATION_TYPE,
   LOAN_STATUS,
   NOTIFICATION_TYPE,
   OPEN_LOAN_STATUS,
   OWNER_COPY_STATUS,
+  PREFERENCE_CHANNEL,
   VISIBILITY,
 } from '@bookswap/shared'
 import type {
   AuthorRole as SharedAuthorRole,
+  Channel as SharedChannel,
   Condition as SharedCondition,
   CopyStatus as SharedCopyStatus,
+  DeliveryStatus as SharedDeliveryStatus,
   EditionFormat as SharedEditionFormat,
   FriendshipStatus as SharedFriendshipStatus,
   LoanStatus as SharedLoanStatus,
@@ -23,8 +30,10 @@ import type {
 } from '@bookswap/shared'
 import {
   AuthorRole as PrismaAuthorRole,
+  Channel as PrismaChannel,
   Condition as PrismaCondition,
   CopyStatus as PrismaCopyStatus,
+  DeliveryStatus as PrismaDeliveryStatus,
   EditionFormat as PrismaEditionFormat,
   FriendshipStatus as PrismaFriendshipStatus,
   LoanStatus as PrismaLoanStatus,
@@ -33,8 +42,10 @@ import {
 } from '../generated/prisma/enums'
 import type {
   AuthorRole as PrismaAuthorRoleType,
+  Channel as PrismaChannelType,
   Condition as PrismaConditionType,
   CopyStatus as PrismaCopyStatusType,
+  DeliveryStatus as PrismaDeliveryStatusType,
   EditionFormat as PrismaEditionFormatType,
   FriendshipStatus as PrismaFriendshipStatusType,
   LoanStatus as PrismaLoanStatusType,
@@ -58,6 +69,8 @@ const _copyStatusMatches: Equal<SharedCopyStatus, PrismaCopyStatusType> = true
 const _conditionMatches: Equal<SharedCondition, PrismaConditionType> = true
 const _loanStatusMatches: Equal<SharedLoanStatus, PrismaLoanStatusType> = true
 const _notificationTypeMatches: Equal<SharedNotificationType, PrismaNotificationTypeType> = true
+const _channelMatches: Equal<SharedChannel, PrismaChannelType> = true
+const _deliveryStatusMatches: Equal<SharedDeliveryStatus, PrismaDeliveryStatusType> = true
 
 describe('Visibility: shared ↔ Prisma', () => {
   it('містить ті самі значення', () => {
@@ -245,5 +258,64 @@ describe('NotificationType: shared ↔ Prisma', () => {
   it('LOAN_CANCELLED присутній і в shared, і в Prisma', () => {
     expect([...NOTIFICATION_TYPE]).toContain('LOAN_CANCELLED')
     expect(Object.values(PrismaNotificationType)).toContain('LOAN_CANCELLED')
+  })
+})
+
+describe('Channel: shared ↔ Prisma', () => {
+  it('містить ті самі значення', () => {
+    expect([...CHANNEL].sort()).toEqual(Object.values(PrismaChannel).sort())
+  })
+
+  it('типи взаємно присвоювані', () => {
+    expect(_channelMatches).toBe(true)
+  })
+
+  it('відповідає §4.8', () => {
+    expect([...CHANNEL].sort()).toEqual(['EMAIL', 'IN_APP', 'TELEGRAM'])
+  })
+
+  /**
+   * §7.6 покриває **всі** канали §4.8, `IN_APP` включно.
+   *
+   * Тест стоїть тут, бо спокуса виключити in-app із матриці («він же завжди
+   * увімкнений») повертається щоразу, а ціна її — мовчазно відібраний у людини
+   * вибір: отримувати сповіщення лише в Telegram і не бачити лічильника
+   * непрочитаних.
+   */
+  it('матриця §7.6 покриває всі канали §4.8, включно з IN_APP', () => {
+    expect([...PREFERENCE_CHANNEL].sort()).toEqual(Object.values(PrismaChannel).sort())
+    expect([...PREFERENCE_CHANNEL]).toContain('IN_APP')
+  })
+})
+
+describe('DeliveryStatus: shared ↔ Prisma', () => {
+  it('містить ті самі значення', () => {
+    expect([...DELIVERY_STATUS].sort()).toEqual(Object.values(PrismaDeliveryStatus).sort())
+  })
+
+  it('типи взаємно присвоювані', () => {
+    expect(_deliveryStatusMatches).toBe(true)
+  })
+
+  it('відповідає §4.8', () => {
+    expect([...DELIVERY_STATUS].sort()).toEqual(['FAILED', 'PENDING', 'SENT'])
+  })
+})
+
+describe('§7.5: негайно vs дайджест ↔ Prisma', () => {
+  /**
+   * Розбиття живе в `shared`, а перевірка на повноту — тут, де видно Prisma-enum:
+   * новий тип події, доданий у схему й у shared, але забутий в обох списках §7.5,
+   * не надсилався б ніколи, і жоден інший тест цього не помітив би.
+   */
+  it('покриває всі типи Prisma без перетину', () => {
+    const immediate = new Set<string>(IMMEDIATE_NOTIFICATION_TYPE)
+    const digest = new Set<string>(DIGEST_NOTIFICATION_TYPE)
+
+    for (const type of Object.values(PrismaNotificationType)) {
+      expect(immediate.has(type) !== digest.has(type)).toBe(true)
+    }
+
+    expect(immediate.size + digest.size).toBe(NOTIFICATION_TYPE.length)
   })
 })

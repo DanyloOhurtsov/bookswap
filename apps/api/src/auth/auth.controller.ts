@@ -125,8 +125,8 @@ export class AuthController {
   @Post('password-reset')
   @Throttle(EMAIL_LIMIT)
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestPasswordReset(@Body() dto: RequestPasswordResetDto): Promise<AcceptedResponse> {
-    await this.auth.requestPasswordReset(dto.email)
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto): AcceptedResponse {
+    this.auth.requestPasswordReset(dto.email)
 
     return { accepted: true }
   }

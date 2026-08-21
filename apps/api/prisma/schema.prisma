@@ -475,6 +475,16 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
+  /// Ключ ідемпотентності щоденного дайджесту (§7.5): `<userId>:<type>:<YYYY-MM-DD>`.
+  ///
+  /// Доповнення до §4.8, і вимушене. Дайджест мусить бути ідемпотентним між
+  /// ПРОЦЕСАМИ: прапорець у пам'яті воркера не заважає двом інстансам API
+  /// одночасно прочитати «сьогодні ще не надсилали» й створити дублікати.
+  /// Унікальний індекс перекладає це рішення на базу — єдиного місця, яке бачать
+  /// обидва процеси. `null` для всіх негайних подій §7.5: у Postgres унікальність
+  /// не поширюється на NULL, тож вони не заважають одна одній.
+  digestKey String? @unique
+
   user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries NotificationDelivery[]
 
@@ -492,6 +502,19 @@ model NotificationDelivery {
   nextAttemptAt  DateTime       @default(now())
   sentAt         DateTime?
   error          String?
+
+  /// Хто саме зараз тримає цей рядок. Доповнення до §4.8 — і без нього черга
+  /// некоректна.
+  ///
+  /// «Захопив рядок» і «маю право записати результат» — різні твердження.
+  /// Воркер, чия оренда протухла (процес завис, GC, повільна мережа), не має
+  /// права затерти результат того, хто підхопив рядок після нього: інакше свіжий
+  /// `SENT` перетворюється на старий `PENDING`, і лист іде втретє. Тому кожне
+  /// захоплення виписує НОВИЙ токен, а фінальний запис іде з умовою
+  /// `WHERE leaseToken = <мій>` — класичний fencing token.
+  leaseToken String?
+  /// Доки діє оренда. Після цього моменту рядок може забрати будь-хто.
+  leaseUntil DateTime?
 
   notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 

@@ -14,6 +14,8 @@ import { LibraryModule } from './library/library.module'
 import { LoansModule } from './loans/loans.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { PrismaModule } from './prisma/prisma.module'
+import { TelegramApiModule } from './telegram/telegram-api.module'
+import { TelegramModule } from './telegram/telegram.module'
 import { UsersModule } from './users/users.module'
 
 /**
@@ -44,6 +46,9 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
     }),
     PrismaModule,
     EmailModule,
+    // Транспорт Telegram — глобальний і без доменних залежностей, як і пошта.
+    // Сам бот (`TelegramModule`) підключається нижче, після `LoansModule`.
+    TelegramApiModule,
     AccessModule,
     NotificationsModule,
     AuthModule,
@@ -52,6 +57,7 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
     CatalogModule,
     LibraryModule,
     LoansModule,
+    TelegramModule,
     HistoryModule,
     HealthModule,
   ],

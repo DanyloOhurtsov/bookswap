@@ -24,6 +24,7 @@ export default function HomePage() {
         <Link href="/loans">Позичання</Link>
         <Link href="/history">Історія</Link>
         <Link href="/notifications">Сповіщення</Link>
+        <Link href="/notifications/settings">Налаштування сповіщень</Link>
       </nav>
 
       <HealthStatus />

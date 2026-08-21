@@ -33,7 +33,10 @@ export class ApiRequestError extends Error {
 }
 
 interface RequestOptions<T> {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  // `PUT` — заради `PUT /me/notification-preferences` (§8): клієнт надсилає стан
+  // клітинок матриці, а не інструкцію їх змінити, і повторний однаковий запит
+  // нічого не змінює.
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
   /** Схема з `@bookswap/shared`, якою розбирається успішна відповідь. */
   schema?: ZodType<T>

@@ -514,3 +514,89 @@ button:disabled {
 .badge--count {
   margin-left: 0.4rem;
 }
+
+/* --- Налаштування сповіщень (§7.6) --------------------------------------- */
+
+/*
+ * Канал — рядок «що це» + «що з ним зробити». Кнопка притиснута вправо, бо в
+ * трьох рядках поспіль дія має бути на одній вертикалі: інакше око шукає її
+ * заново в кожному.
+ */
+.channels {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.channel {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.channel:last-of-type {
+  border-bottom: none;
+}
+
+.channel__detail {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/*
+ * Матриця «тип події × канал».
+ *
+ * Обгортка зі своїм скролом, а не `overflow` на сторінці: при вузькому екрані
+ * горизонтально має їхати саме таблиця, інакше разом із нею їде весь текст
+ * навколо, і сторінка виглядає зламаною.
+ */
+.matrix-scroll {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.matrix th,
+.matrix td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Колонки каналів вузькі й по центру: у них лише прапорець. */
+.matrix thead th:not(:first-child),
+.matrix tbody td {
+  width: 8rem;
+  text-align: center;
+}
+
+.matrix tbody th {
+  font-weight: 400;
+}
+
+.matrix tbody tr:last-of-type th,
+.matrix tbody tr:last-of-type td {
+  border-bottom: none;
+}
+
+/* Уточнення під заголовком — адреса пошти, стан Telegram, «раз на день». */
+.matrix__detail {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Недоступна колонка (Telegram без прив'язки) має виглядати недоступною, а не
+   просто вимкненою: інакше людина клікає в неї й не розуміє, чому нічого. */
+.matrix input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
