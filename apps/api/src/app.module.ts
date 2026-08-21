@@ -17,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module'
 import { TelegramApiModule } from './telegram/telegram-api.module'
 import { TelegramModule } from './telegram/telegram.module'
 import { UsersModule } from './users/users.module'
+import { WishlistModule } from './wishlist/wishlist.module'
 
 /**
  * §12.2: `.env` — один, у корені репозиторію. Шлях однаковий і для `src/`, і для
@@ -61,6 +62,7 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
     FriendsModule,
     CatalogModule,
     LibraryModule,
+    WishlistModule,
     LoansModule,
     TelegramModule,
     HistoryModule,

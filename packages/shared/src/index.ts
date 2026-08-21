@@ -289,3 +289,14 @@ export {
   type BookLookupResponse,
   type BookLookupResult,
 } from './contracts/lookup'
+export {
+  WISHLIST_LIMITS,
+  addWishlistItemRequestSchema,
+  wishlistItemResponseSchema,
+  wishlistItemSchema,
+  wishlistResponseSchema,
+  type AddWishlistItemRequest,
+  type WishlistItem,
+  type WishlistItemResponse,
+  type WishlistResponse,
+} from './contracts/wishlist'

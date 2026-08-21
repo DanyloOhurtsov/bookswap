@@ -160,13 +160,35 @@ export class LibraryService {
     const visible = copies.filter((copy) =>
       copyVisibleTo(role, owner.libraryVisibility, copy.visibility),
     )
+    const groups = groupByEdition(visible, (copy) =>
+      toVisibleCopy(copy, { id: viewerId, role, showHolderNames }),
+    )
+    const wishlisted = await this.wishlistedWorkIds(
+      viewerId,
+      groups.map((group) => group.work.id),
+    )
 
     return {
       owner: toPublicUser(owner),
-      groups: groupByEdition(visible, (copy) =>
-        toVisibleCopy(copy, { id: viewerId, role, showHolderNames }),
-      ),
+      groups: groups.map((group) => ({ ...group, inWishlist: wishlisted.has(group.work.id) })),
     }
+  }
+
+  /**
+   * §6.5: «Позначка, які з них у вішлисті користувача». Читається напряму
+   * `PrismaService`, а не через `WishlistModule`: питання тут вужче за весь
+   * вішлист — лише «чи є рядок для цих `Work`» — і не варте окремої залежності
+   * між модулями заради одного `findMany`.
+   */
+  private async wishlistedWorkIds(viewerId: string, workIds: string[]): Promise<Set<string>> {
+    if (workIds.length === 0) return new Set()
+
+    const rows = await this.prisma.wishlistItem.findMany({
+      where: { userId: viewerId, workId: { in: workIds } },
+      select: { workId: true },
+    })
+
+    return new Set(rows.map((row) => row.workId))
   }
 
   /**
