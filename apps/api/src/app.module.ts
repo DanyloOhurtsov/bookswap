@@ -42,7 +42,12 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
      * Значення нижче — стеля, яку ті `@Throttle` звужують.
      */
     ThrottlerModule.forRoot({
-      throttlers: [{ name: 'auth', limit: 120, ttl: 60_000 }],
+      throttlers: [
+        { name: 'auth', limit: 120, ttl: 60_000 },
+        // docs/plan/stage-7.md, 7b: окремий бакет для GET /catalog/lookup —
+        // інша природа захисту, ніж 'auth' (див. common/rate-limit.config.ts).
+        { name: 'lookup', limit: 120, ttl: 60_000 },
+      ],
     }),
     PrismaModule,
     EmailModule,

@@ -276,3 +276,11 @@ export {
   type TelegramLinkResponse,
   type UpdateNotificationPreferencesRequest,
 } from './contracts/notification'
+export {
+  bookLookupRequestSchema,
+  bookLookupResponseSchema,
+  bookLookupResultSchema,
+  type BookLookupRequest,
+  type BookLookupResponse,
+  type BookLookupResult,
+} from './contracts/lookup'

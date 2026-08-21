@@ -66,6 +66,16 @@ export const envSchema = z
       .int()
       .positive()
       .default(60 * 60_000),
+    /**
+     * §11, R2, docs/plan/stage-7.md 7b: ліміт на `GET /catalog/lookup` і його
+     * вікно. Окремий бакет від `CATALOG_WRITE_RATE_LIMIT` — див.
+     * `common/rate-limit.config.ts` про різницю в природі захисту. Дефолти
+     * тут дублюють фолбек у `rate-limit.config.ts` з тієї ж причини, що й у
+     * write-ліміту: криве значення мусить падати на старті, а не тихо ставати
+     * дефолтом.
+     */
+    CATALOG_LOOKUP_RATE_LIMIT: z.coerce.number().int().positive().default(20),
+    CATALOG_LOOKUP_RATE_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     /** Ключ Resend. Обов'язковий лише для `EMAIL_PROVIDER=resend` — див. superRefine. */
     RESEND_API_KEY: z.string().min(1).optional(),
     /** Відправник у форматі `Name <address@domain>` або просто адреси. */

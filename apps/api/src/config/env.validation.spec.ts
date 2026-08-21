@@ -55,6 +55,8 @@ describe('validateEnv', () => {
       EMAIL_PROVIDER: 'dev',
       CATALOG_WRITE_RATE_LIMIT: 30,
       CATALOG_WRITE_RATE_WINDOW_MS: 3600000,
+      CATALOG_LOOKUP_RATE_LIMIT: 20,
+      CATALOG_LOOKUP_RATE_WINDOW_MS: 60000,
     })
   })
 })
