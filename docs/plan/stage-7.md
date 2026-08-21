@@ -119,6 +119,9 @@ Definition of done:
 
 Дозволено чіпати: apps/api/src/catalog/merge/**, prisma/schema.prisma,
 apps/api/src/cli/**, apps/api/test/**
+Схема вже містить mergedIntoId, самозв'язок WorkMerge і індекс — міграція
+під це не потрібна. Нова міграція може знадобитись лише під R5 (partial unique
+на Review з archivedAt).
 
 Definition of done:
 - merge доступний як admin CLI-команда, не як публічний ендпоінт

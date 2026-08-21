@@ -204,6 +204,33 @@ export const editionDetailResponseSchema = z.object({
 
 export type EditionDetailResponse = z.infer<typeof editionDetailResponseSchema>
 
+// --- Кандидати для дедуплікації (§6.3, крок 2; Етап 7c) ----------------------
+
+/**
+ * Скільки кандидатів показати перед створенням нового `Work`/`Edition`.
+ *
+ * Це підказка «може, така книжка вже є», а не список для гортання — тому
+ * пагінації свідомо немає: якщо серед перших {@link SEARCH_CANDIDATES_LIMIT}
+ * нічого не підійшло, людина створює нове, а не гортає сторінки в пошуках
+ * дубліката.
+ */
+export const SEARCH_CANDIDATES_LIMIT = 10
+
+export const searchCandidatesRequestSchema = catalogSearchRequestSchema
+
+export type SearchCandidatesRequest = z.infer<typeof searchCandidatesRequestSchema>
+
+/**
+ * Кожен кандидат — це `WorkDetailResponse`: та сама форма, що й у `GET
+ * /works/:id`, з усіма `Edition` і `Translation` твору. Людина впізнає своє
+ * видання за видавництвом і роком так само, як на сторінці твору.
+ */
+export const searchCandidatesResponseSchema = z.object({
+  candidates: z.array(workDetailResponseSchema).max(SEARCH_CANDIDATES_LIMIT),
+})
+
+export type SearchCandidatesResponse = z.infer<typeof searchCandidatesResponseSchema>
+
 // --- Створення ---------------------------------------------------------------
 
 /**
