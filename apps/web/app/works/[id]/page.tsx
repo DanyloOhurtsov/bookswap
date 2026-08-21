@@ -17,11 +17,13 @@ import { AuthorLine, Chip, EditionLine } from '../../components/book'
 import { SelectField, TextField } from '../../components/form-field'
 import { FormStatus } from '../../components/form-status'
 import { HistoryEntryLine } from '../../components/history'
+import { WishlistButton } from '../../components/wishlist-button'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../lib/labels'
 import { useWork } from '../../lib/use-catalog'
 import { useWorkHistory } from '../../lib/use-history'
 import { useSession } from '../../lib/use-session'
+import { useWishlist } from '../../lib/use-wishlist'
 import { validate, type FieldErrors } from '../../lib/validation'
 
 /**
@@ -40,6 +42,7 @@ export default function WorkPage() {
   const { state: session, reload: reloadSession } = useSession()
   const workId = parameters.id
   const { state, reload } = useWork(workId)
+  const wishlist = useWishlist()
 
   useEffect(() => {
     if (session.status === 'guest') router.replace('/login')
@@ -97,6 +100,8 @@ export default function WorkPage() {
         <AuthorLine authors={authors} />
       </p>
 
+      <WishlistButton work={work} authors={authors} wishlist={wishlist} />
+
       <dl className="facts">
         <dt>Мова оригіналу</dt>
         <dd>{work.origLang}</dd>
@@ -140,7 +145,8 @@ export default function WorkPage() {
 
       <p className="form__aside">
         <Link href={`/catalog/new?workId=${work.id}`}>Додати переклад або видання</Link> ·{' '}
-        <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link>
+        <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
+        <Link href="/wishlist">Вішлист</Link>
       </p>
     </main>
   )

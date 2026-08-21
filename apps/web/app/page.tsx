@@ -21,6 +21,7 @@ export default function HomePage() {
         <Link href="/friends">Друзі</Link>
         <Link href="/catalog">Каталог</Link>
         <Link href="/library">Моя бібліотека</Link>
+        <Link href="/wishlist">Вішлист</Link>
         <Link href="/loans">Позичання</Link>
         <Link href="/history">Історія</Link>
         <Link href="/notifications">Сповіщення</Link>
