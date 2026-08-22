@@ -193,8 +193,8 @@ enum FriendshipStatus {
 // ---------------------------------------------------------------------------
 
 model Author {
-  id   String @id @default(cuid())
-  name String
+  id        String  @id @default(cuid())
+  name      String
   /// lower + unaccent, для пошуку — дзеркало `Work.titleNorm`.
   ///
   /// ВІДХИЛЕННЯ ВІД §4.4: цієї колонки в специфікації немає. Без неї fuzzy-пошук
@@ -252,8 +252,13 @@ model Work {
   authors      WorkAuthor[]
   editions     Edition[]
   translations Translation[]
-  reviews      Review[]
+  reviews      Review[]       @relation("ReviewWork")
   wishlistedBy WishlistItem[]
+
+  /// Зворотний бік `Review.archivedByMergeSource` (R5). Іменований зв'язок потрібен
+  /// суто тому, що між `Review` і `Work` їх стало два — сам по собі цей список
+  /// нікому не читається.
+  reviewsArchivedByMerge Review[] @relation("ReviewArchivedByMerge")
 
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
@@ -344,7 +349,7 @@ model Copy {
   /// Хто фізично тримає книгу зараз. Дорівнює ownerId, коли книга вдома (інваріант §5.3.2).
   currentHolderId String
 
-  status CopyStatus @default(AVAILABLE)
+  status     CopyStatus @default(AVAILABLE)
   /// §4.5: ортогонально до status. Прихована книга може бути одночасно позиченою.
   visibility Visibility @default(FRIENDS)
   condition  Condition  @default(GOOD)
@@ -386,8 +391,8 @@ enum Condition {
 
 /// Ця таблиця одночасно є історією (§6.6). Окремої `CopyHistory` немає.
 model Loan {
-  id     String @id @default(cuid())
-  copyId String
+  id         String     @id @default(cuid())
+  copyId     String
   /// денормалізовано з Copy на момент створення
   ownerId    String
   borrowerId String
@@ -429,32 +434,52 @@ enum LoanStatus {
 
 /// §3: відгуки на твір, щоб не розповзалися по виданнях.
 model Review {
-  id     String @id @default(cuid())
-  workId String
-  userId String
+  id        String   @id @default(cuid())
+  workId    String
+  userId    String
   /// 1..5
   rating    Int
   text      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  work Work @relation(fields: [workId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// R5 (docs/plan/stage-7.md): мерж двох `Work` не має права втратити рецензію.
+  /// Якщо після переносу на канонічний твір у людини їх стало дві, активною
+  /// лишається новіша за `updatedAt`, а друга архівується — рядок нікуди не
+  /// зникає, лише перестає бути «тим самим відгуком».
+  archivedAt DateTime?
 
-  @@unique([workId, userId])
+  /// `Work`, який зливали, коли цей відгук заархівували.
+  ///
+  /// Id вихідного твору однозначно ідентифікує операцію мержу саме тому, що
+  /// `MergeService` вимагає канонічного source: твір може побувати вихідним
+  /// рівно один раз, після чого його власний `mergedIntoId` уже проставлено й
+  /// другий мерж із нього відхиляється (`WORK_MERGE_SOURCE_ALREADY_MERGED`).
+  /// Тому окрема таблиця-журнал мержів тут не потрібна.
+  archivedByMergeSourceId String?
+
+  work                  Work  @relation("ReviewWork", fields: [workId], references: [id], onDelete: Cascade)
+  archivedByMergeSource Work? @relation("ReviewArchivedByMerge", fields: [archivedByMergeSourceId], references: [id])
+  user                  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// §4.7 «один користувач — один відгук на твір» живе не тут, а частковим
+  /// унікальним індексом `one_active_review_per_work_user` (`WHERE "archivedAt"
+  /// IS NULL`), дописаним у міграції руками: Prisma Schema Language часткових
+  /// індексів не виражає. Тут його немає навмисно — інакше архівна копія й
+  /// активна рецензія тієї самої людини не могли б співіснувати після мержу.
   @@index([workId])
 }
 
 /// §3: оцінка якості перекладу висить на `Translation`, а НЕ на `Edition`. Один
 /// переклад виходить у кількох видавництвах — на виданні ранг розмазався б.
 model TranslationRating {
-  id            String @id @default(cuid())
+  id            String   @id @default(cuid())
   translationId String
   userId        String
   /// 1..5 — якість перекладу, не твору
-  rating    Int
-  text      String?
-  createdAt DateTime @default(now())
+  rating        Int
+  text          String?
+  createdAt     DateTime @default(now())
 
   translation Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -481,13 +506,13 @@ model WishlistItem {
 /// §4.8: розділення Notification / NotificationDelivery не декоративне — одна подія
 /// йде в кілька каналів, і кожен має власний статус та лічильник спроб.
 model Notification {
-  id     String           @id @default(cuid())
-  userId String
-  type   NotificationType
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
   /// loanId, copyId, actorId тощо
   payload   Json
   readAt    DateTime?
-  createdAt DateTime  @default(now())
+  createdAt DateTime         @default(now())
 
   /// Ключ ідемпотентності щоденного дайджесту (§7.5): `<userId>:<type>:<YYYY-MM-DD>`.
   ///
