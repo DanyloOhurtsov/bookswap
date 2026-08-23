@@ -7,10 +7,12 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import type {
+  ApiError,
   CatalogSearchResponse,
   EditionDetailResponse,
   EditionResponse,
@@ -21,6 +23,8 @@ import type {
 import { CurrentUser } from '../auth/authenticated-request'
 import { SessionGuard } from '../auth/session.guard'
 import { CATALOG_WRITE_RATE_LIMIT, CATALOG_WRITE_RATE_WINDOW_MS } from '../common/rate-limit.config'
+import { CanonicalWorkService } from './canonical/canonical-work.service'
+import { redirectToCanonicalWork } from './canonical/work-redirect'
 import { CatalogService } from './catalog.service'
 import {
   CatalogSearchDto,
@@ -28,6 +32,7 @@ import {
   CreateTranslationDto,
   CreateWorkDto,
 } from './dto/catalog.dto'
+import type { Response } from 'express'
 import type { UserModel } from '../generated/prisma/models'
 
 /**
@@ -49,7 +54,10 @@ const CATALOG_SEARCH_LIMIT = { auth: { limit: 60, ttl: 60_000 } }
 @Controller()
 @UseGuards(SessionGuard)
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly canonical: CanonicalWorkService,
+  ) {}
 
   @Get('catalog/search')
   @UseGuards(ThrottlerGuard)
@@ -58,14 +66,33 @@ export class CatalogController {
     return this.catalog.search(dto.q)
   }
 
+  /**
+   * §6.3: a merged work answers 301 on the canonical one — see
+   * `canonical/work-redirect.ts`. `@Res({ passthrough: true })` gives the
+   * redirect its headers while Nest still serialises the returned body.
+   */
   @Get('works/:id')
-  getWork(@Param('id') id: string): Promise<WorkDetailResponse> {
-    return this.catalog.getWork(id)
+  async getWork(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WorkDetailResponse | ApiError> {
+    const resolved = await this.canonical.resolve(id)
+
+    if (resolved.moved) return redirectToCanonicalWork(response, resolved)
+
+    return this.catalog.getWork(resolved.workId)
   }
 
   @Get('works/:id/translations')
-  listTranslations(@Param('id') id: string): Promise<TranslationListResponse> {
-    return this.catalog.listTranslations(id)
+  async listTranslations(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TranslationListResponse | ApiError> {
+    const resolved = await this.canonical.resolve(id)
+
+    if (resolved.moved) return redirectToCanonicalWork(response, resolved, '/translations')
+
+    return this.catalog.listTranslations(resolved.workId)
   }
 
   @Post('works')

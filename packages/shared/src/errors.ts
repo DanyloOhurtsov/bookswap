@@ -69,6 +69,19 @@ export const API_ERROR_CODES = {
    * примірника редагується завжди.
    */
   COPY_STATUS_LOCKED: 'COPY_STATUS_LOCKED',
+  /**
+   * The addressed `Work` was merged into another one (§6.3, R4).
+   *
+   * One code, two statuses. Reads answer 301 with a `Location` header, as §6.3
+   * requires. Writes answer 409 instead: silently retargeting a POST to a record
+   * the client never named would hide the move from the only party that can
+   * decide whether it still wants to write there.
+   *
+   * `details.canonicalWorkId` carries the work to use instead — the point of a
+   * dedicated code is that the client can retarget itself rather than show an
+   * error.
+   */
+  WORK_MERGED: 'WORK_MERGED',
 
   // --- ISBN lookup (§6.3, §11, docs/plan/stage-7.md 7b) -----------------------
   /**

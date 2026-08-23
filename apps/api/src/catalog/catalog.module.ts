@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
+import { CanonicalWorkModule } from './canonical/canonical-work.module'
 import { CatalogController } from './catalog.controller'
 import { CatalogService } from './catalog.service'
 import { LookupModule } from './lookup/lookup.module'
@@ -17,7 +18,7 @@ import { TextNormalizer } from './text-normalizer'
  * `catalog`, що й `CatalogController`.
  */
 @Module({
-  imports: [AuthModule, LookupModule, SearchCandidatesModule],
+  imports: [AuthModule, CanonicalWorkModule, LookupModule, SearchCandidatesModule],
   controllers: [CatalogController],
   providers: [CatalogService, TextNormalizer],
   exports: [TextNormalizer],

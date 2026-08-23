@@ -41,12 +41,26 @@ export default function WorkPage() {
   const router = useRouter()
   const { state: session, reload: reloadSession } = useSession()
   const workId = parameters.id
-  const { state, reload } = useWork(workId)
+  const { state, reload, canonicalWorkId } = useWork(workId)
   const wishlist = useWishlist()
 
   useEffect(() => {
     if (session.status === 'guest') router.replace('/login')
   }, [session.status, router])
+
+  /**
+   * §6.3: reading a merged work answers 301 on the canonical one, and `fetch`
+   * follows it — so the data below is already right, and only the address bar
+   * is stale. Left alone it is the stale part that spreads: the URL people copy
+   * out of it, bookmark and paste into chats would keep pointing at a duplicate
+   * whose page is empty of everything but a title.
+   *
+   * `replace`, not `push`: the merged id is not a place worth being able to
+   * navigate back to.
+   */
+  useEffect(() => {
+    if (canonicalWorkId !== null) router.replace(`/works/${encodeURIComponent(canonicalWorkId)}`)
+  }, [canonicalWorkId, router])
 
   if (session.status === 'loading' || state.status === 'loading') {
     return (

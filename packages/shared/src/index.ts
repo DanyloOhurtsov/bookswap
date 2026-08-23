@@ -159,6 +159,7 @@ export {
   workAuthorInputSchema,
   workAuthorSchema,
   workDetailResponseSchema,
+  workMergedDetailsSchema,
   workSchema,
   type AuthorMatch,
   type CatalogMatchKind,
@@ -180,6 +181,7 @@ export {
   type WorkAuthor,
   type WorkAuthorInput,
   type WorkDetailResponse,
+  type WorkMergedDetails,
 } from './contracts/catalog'
 export {
   LIBRARY_LIMITS,

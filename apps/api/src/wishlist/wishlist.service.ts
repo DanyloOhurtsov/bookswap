@@ -1,6 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common'
-import { API_ERROR_CODES, type WishlistItemResponse, type WishlistResponse } from '@bookswap/shared'
-import { ApiException } from '../common/api.exception'
+import { Injectable } from '@nestjs/common'
+import { type WishlistItemResponse, type WishlistResponse } from '@bookswap/shared'
+import { CanonicalWorkService } from '../catalog/canonical/canonical-work.service'
 import { isUniqueViolation } from '../common/prisma-errors'
 import { PrismaService } from '../prisma/prisma.service'
 import { toWishlistItem } from './wishlist.mapper'
@@ -18,7 +18,10 @@ const WITH_WORK = {
  */
 @Injectable()
 export class WishlistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly canonical: CanonicalWorkService,
+  ) {}
 
   async list(userId: string): Promise<WishlistResponse> {
     const rows = await this.prisma.wishlistItem.findMany({
@@ -40,7 +43,7 @@ export class WishlistService {
    * до «хто встиг перевірити першим».
    */
   async add(userId: string, workId: string): Promise<WishlistItemResponse> {
-    await this.assertWorkExists(workId)
+    await this.canonical.assertCanonical(workId)
 
     try {
       const row = await this.prisma.wishlistItem.create({
@@ -68,22 +71,13 @@ export class WishlistService {
 
   /** Ідемпотентно: відсутній рядок — не помилка, а вже досягнутий бажаний стан. */
   async remove(userId: string, workId: string): Promise<void> {
+    // Stage 7h. A merged work is refused here too, and that does not contradict
+    // the idempotence above: "no such row" and "the row moved" are different
+    // states. The merge carried this user's item over to the canonical work, so
+    // a delete by the old id would report success while the item stayed in the
+    // list — the one outcome the caller must not be told.
+    await this.canonical.assertCanonical(workId)
+
     await this.prisma.wishlistItem.deleteMany({ where: { userId, workId } })
-  }
-
-  /**
-   * Змержений твір (`mergedIntoId != null`) не рахується ціллю — той самий
-   * інваріант, що й у пошуку кандидатів (Етап 7c): R4 переносить розв'язання
-   * канонічності на Етап 7h, а до нього змержений твір просто не існує як ціль.
-   */
-  private async assertWorkExists(workId: string): Promise<void> {
-    const work = await this.prisma.work.findUnique({
-      where: { id: workId },
-      select: { id: true, mergedIntoId: true },
-    })
-
-    if (work === null || work.mergedIntoId !== null) {
-      throw new ApiException(API_ERROR_CODES.NOT_FOUND, 'Твір не знайдено', HttpStatus.NOT_FOUND)
-    }
   }
 }

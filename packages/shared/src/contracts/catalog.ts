@@ -204,6 +204,27 @@ export const editionDetailResponseSchema = z.object({
 
 export type EditionDetailResponse = z.infer<typeof editionDetailResponseSchema>
 
+// --- Canonical resolution after a merge (§6.3; stage 7h) ---------------------
+
+/**
+ * The `details` payload that rides along with `WORK_MERGED`.
+ *
+ * Reads carry it in the body of the 301, writes in the body of the 409, and it
+ * is the same shape either way: the client needs the same two facts in both
+ * cases — which work it asked for, and which one answers for it now.
+ *
+ * Resolution is exactly one hop deep, so `canonicalWorkId` is never itself
+ * merged. That is invariant R4, held by `merge.service.ts`: a merge whose source
+ * or target is already merged is refused, and every incoming `mergedIntoId` is
+ * repointed at the new target.
+ */
+export const workMergedDetailsSchema = z.object({
+  canonicalWorkId: z.string(),
+  requestedWorkId: z.string(),
+})
+
+export type WorkMergedDetails = z.infer<typeof workMergedDetailsSchema>
+
 // --- Кандидати для дедуплікації (§6.3, крок 2; Етап 7c) ----------------------
 
 /**
