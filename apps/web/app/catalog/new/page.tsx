@@ -26,6 +26,7 @@ import {
   type BookLookupResult,
   type Condition,
   type EditionFormat,
+  type Translation,
   type Visibility,
   type WorkDetailResponse,
 } from '@bookswap/shared'
@@ -40,6 +41,7 @@ import {
   LANGUAGE_HINTS,
   VISIBILITY_LABELS,
 } from '../../lib/labels'
+import { mapLookupResultToDraft } from '../../lib/lookup-mapping'
 import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'
 
@@ -91,7 +93,20 @@ interface AuthorEntry {
 type Step =
   | { kind: 'search' }
   | { kind: 'work'; initialTitle: string; isbn?: string; lookup?: BookLookupResult }
-  | { kind: 'translation'; workId: string; title: string; isbn?: string; lookup?: BookLookupResult }
+  | {
+      kind: 'translation'
+      workId: string
+      title: string
+      isbn?: string
+      lookup?: BookLookupResult
+      /**
+       * Лише в гілці «наявний Work» (Етап 7c/7d, п.12): переклади, які вже є
+       * в цього твору — щоб не заводити дублікат `Translation`, коли підходить
+       * наявний. У гілці «нічого не знайдено» Work щойно створений, тож тут
+       * завжди `undefined`.
+       */
+      existingTranslations?: Translation[]
+    }
   | {
       kind: 'edition'
       workId: string
@@ -170,8 +185,8 @@ function Wizard() {
           onFoundEdition={(workId, title, editionId) => {
             setStep({ kind: 'copy', workId, title, editionId })
           }}
-          onFoundWork={(workId, title) => {
-            setStep({ kind: 'translation', workId, title })
+          onFoundWork={(workId, title, isbn, lookup, existingTranslations) => {
+            setStep({ kind: 'translation', workId, title, isbn, lookup, existingTranslations })
           }}
           onCreateNew={(initialTitle, isbn, lookup) => {
             setStep({ kind: 'work', initialTitle, isbn, lookup })
@@ -192,6 +207,8 @@ function Wizard() {
       {step.kind === 'translation' && (
         <TranslationStep
           workId={step.workId}
+          lookup={step.lookup}
+          existingTranslations={step.existingTranslations}
           onDone={(translationId) => {
             setStep({
               kind: 'edition',
@@ -328,7 +345,13 @@ function SearchStep({
 }: {
   initialQuery: string
   onFoundEdition: (workId: string, title: string, editionId: string) => void
-  onFoundWork: (workId: string, title: string) => void
+  onFoundWork: (
+    workId: string,
+    title: string,
+    isbn?: string,
+    lookup?: BookLookupResult,
+    existingTranslations?: Translation[],
+  ) => void
   onCreateNew: (initialTitle: string, isbn?: string, lookup?: BookLookupResult) => void
 }) {
   const [query, setQuery] = useState(initialQuery)
@@ -437,7 +460,17 @@ function SearchStep({
                   onFoundEdition(candidate.work.id, candidate.work.title, editionId)
                 }}
                 onUseWork={() => {
-                  onFoundWork(candidate.work.id, candidate.work.title)
+                  // Дані lookup (Етап 7b) і наявні переклади цього твору
+                  // (§6.3 п.12) їдуть далі разом із вибором — інакше нове
+                  // Edition/Translation губить чернетку, підставлену на кроці
+                  // пошуку.
+                  onFoundWork(
+                    candidate.work.id,
+                    candidate.work.title,
+                    searchedIsbn,
+                    lookup,
+                    candidate.translations,
+                  )
                 }}
               />
             ))}
@@ -516,16 +549,18 @@ function WorkStep({
   lookup?: BookLookupResult
   onCreated: (workId: string, title: string) => void
 }) {
-  const [title, setTitle] = useState(lookup?.title ?? initialTitle)
+  const draft = mapLookupResultToDraft(lookup)
+  const [title, setTitle] = useState(draft.work.title === '' ? initialTitle : draft.work.title)
   const [origLang, setOrigLang] = useState('uk')
-  const [firstPubYear, setFirstPubYear] = useState(
-    lookup?.publishedYear === undefined ? '' : String(lookup.publishedYear),
-  )
+  // §6.3 п.2–3: рік ISBN-видання (`publishedYear`) описує конкретне Edition, не
+  // твір — тому тут навмисно немає жодного значення з lookup. Work.firstPubYear
+  // автозаповнюється лише окремим work-level полем, якого провайдер не дає.
+  const [firstPubYear, setFirstPubYear] = useState('')
   const [description, setDescription] = useState('')
   const [authors, setAuthors] = useState<AuthorEntry[]>(
-    lookup?.authors === undefined || lookup.authors.length === 0
+    draft.work.authors.length === 0
       ? [{ key: 'author-0', name: '', role: 'AUTHOR' }]
-      : lookup.authors.map((name, index) => ({
+      : draft.work.authors.map((name, index) => ({
           key: `author-${String(index)}`,
           name,
           role: 'AUTHOR' as const,
@@ -802,14 +837,22 @@ function AuthorRow({
 
 function TranslationStep({
   workId,
+  lookup,
+  existingTranslations,
   onDone,
 }: {
   workId: string
+  lookup?: BookLookupResult
+  existingTranslations?: Translation[]
   onDone: (translationId: string | null) => void
 }) {
+  const draft = mapLookupResultToDraft(lookup)
   const [translator, setTranslator] = useState('')
-  const [lang, setLang] = useState('uk')
-  const [sourceLang, setSourceLang] = useState('en')
+  // §6.3 п.7: мова ISBN-видання описує мову цього тексту — єдине домен-коректне
+  // місце для неї тут, у мові перекладу. `sourceLang` лишається незаповненою:
+  // з якої мови перекладено provider не повідомляє, і вгадувати заборонено.
+  const [lang, setLang] = useState(draft.translationLang ?? 'uk')
+  const [sourceLang, setSourceLang] = useState('')
   const [year, setYear] = useState('')
   const [isAbridged, setIsAbridged] = useState(false)
   const [hasNotes, setHasNotes] = useState(false)
@@ -854,90 +897,129 @@ function TranslationStep({
   }
 
   return (
-    <form className="form" onSubmit={(event) => void submit(event)} noValidate>
-      <FormStatus error={failure} />
+    <>
+      {existingTranslations !== undefined && existingTranslations.length > 0 && (
+        <>
+          <p className="lede">У цього твору вже є переклади — можливо, ваш серед них.</p>
+          <ul className="books">
+            {existingTranslations.map((existing) => (
+              <li className="book" key={existing.id}>
+                <span className="book__meta">
+                  {existing.translator} · {existing.lang}
+                  {existing.year === null ? '' : ` · ${String(existing.year)}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Наявний переклад передається як є — lookup-мова сюди не
+                    // потрапляє: наявний запис не редагується цим кроком.
+                    onDone(existing.id)
+                  }}
+                >
+                  Використати цей переклад
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="form__aside">Або заведіть новий переклад нижче.</p>
+        </>
+      )}
 
-      <p className="form__aside">Якщо ваш примірник мовою оригіналу — цей крок можна пропустити.</p>
+      <form className="form" onSubmit={(event) => void submit(event)} noValidate>
+        <FormStatus error={failure} />
 
-      <TextField
-        id="translation-translator"
-        label="Перекладач"
-        value={translator}
-        error={errors.translator}
-        onChange={(event) => {
-          setTranslator(event.target.value)
-        }}
-      />
+        <p className="form__aside">
+          Якщо ваш примірник мовою оригіналу — цей крок можна пропустити.
+        </p>
 
-      <LanguageField
-        id="translation-lang"
-        label="Мова перекладу"
-        value={lang}
-        error={errors.lang}
-        onChange={setLang}
-      />
+        {draft.translationLang !== undefined && (
+          <div className="alert alert--ok" role="status">
+            <p>
+              Мову підставлено з зовнішнього джерела за виданням — перевірте й виправте за потреби.
+            </p>
+          </div>
+        )}
 
-      <LanguageField
-        id="translation-source"
-        label="З якої мови перекладено"
-        hint="Переклад з оригіналу і переказ із підрядника — різні речі (§10.3)."
-        value={sourceLang}
-        error={errors.sourceLang}
-        onChange={setSourceLang}
-      />
-
-      <TextField
-        id="translation-year"
-        label="Рік перекладу"
-        type="number"
-        inputMode="numeric"
-        value={year}
-        error={errors.year}
-        onChange={(event) => {
-          setYear(event.target.value)
-        }}
-      />
-
-      <div className="field field--checkbox">
-        <input
-          id="translation-abridged"
-          type="checkbox"
-          checked={isAbridged}
+        <TextField
+          id="translation-translator"
+          label="Перекладач"
+          value={translator}
+          error={errors.translator}
           onChange={(event) => {
-            setIsAbridged(event.target.checked)
+            setTranslator(event.target.value)
           }}
         />
-        <label htmlFor="translation-abridged">Скорочений переклад</label>
-      </div>
 
-      <div className="field field--checkbox">
-        <input
-          id="translation-notes"
-          type="checkbox"
-          checked={hasNotes}
+        <LanguageField
+          id="translation-lang"
+          label="Мова перекладу"
+          value={lang}
+          error={errors.lang}
+          onChange={setLang}
+        />
+
+        <LanguageField
+          id="translation-source"
+          label="З якої мови перекладено"
+          hint="Переклад з оригіналу і переказ із підрядника — різні речі (§10.3)."
+          value={sourceLang}
+          error={errors.sourceLang}
+          onChange={setSourceLang}
+        />
+
+        <TextField
+          id="translation-year"
+          label="Рік перекладу"
+          type="number"
+          inputMode="numeric"
+          value={year}
+          error={errors.year}
           onChange={(event) => {
-            setHasNotes(event.target.checked)
+            setYear(event.target.value)
           }}
         />
-        <label htmlFor="translation-notes">Є примітки й коментарі перекладача</label>
-      </div>
 
-      <div className="person__actions">
-        <button type="submit" disabled={pending}>
-          {pending ? 'Створюю…' : 'Далі: видання'}
-        </button>
-        <button
-          type="button"
-          className="button--ghost"
-          disabled={pending}
-          onClick={() => {
-            onDone(null)
-          }}
-        >
-          Пропустити — це оригінал
-        </button>
-      </div>
-    </form>
+        <div className="field field--checkbox">
+          <input
+            id="translation-abridged"
+            type="checkbox"
+            checked={isAbridged}
+            onChange={(event) => {
+              setIsAbridged(event.target.checked)
+            }}
+          />
+          <label htmlFor="translation-abridged">Скорочений переклад</label>
+        </div>
+
+        <div className="field field--checkbox">
+          <input
+            id="translation-notes"
+            type="checkbox"
+            checked={hasNotes}
+            onChange={(event) => {
+              setHasNotes(event.target.checked)
+            }}
+          />
+          <label htmlFor="translation-notes">Є примітки й коментарі перекладача</label>
+        </div>
+
+        <div className="person__actions">
+          <button type="submit" disabled={pending}>
+            {pending ? 'Створюю…' : 'Далі: видання'}
+          </button>
+          <button
+            type="button"
+            className="button--ghost"
+            disabled={pending}
+            onClick={() => {
+              onDone(null)
+            }}
+          >
+            Пропустити — це оригінал
+          </button>
+        </div>
+      </form>
+    </>
   )
 }
 
@@ -954,10 +1036,10 @@ function EditionStep({
   initialIsbn?: string
   onCreated: (editionId: string) => void
 }) {
-  const [publisher, setPublisher] = useState(lookup?.publisher ?? '')
-  const [year, setYear] = useState(
-    lookup?.publishedYear === undefined ? '' : String(lookup.publishedYear),
-  )
+  const draft = mapLookupResultToDraft(lookup)
+  const [publisher, setPublisher] = useState(draft.edition.publisher)
+  const [year, setYear] = useState(draft.edition.year)
+  const [coverUrl, setCoverUrl] = useState(draft.edition.coverUrl)
   const [isbn13, setIsbn13] = useState(initialIsbn ?? '')
   const [pageCount, setPageCount] = useState('')
   const [format, setFormat] = useState<EditionFormat>('PAPERBACK')
@@ -975,6 +1057,7 @@ function EditionStep({
       year: year === '' ? null : Number(year),
       isbn13: isbn13.trim() === '' ? null : isbn13,
       pageCount: pageCount === '' ? null : Number(pageCount),
+      coverUrl: coverUrl.trim() === '' ? null : coverUrl,
       format,
     })
 
@@ -1054,6 +1137,18 @@ function EditionStep({
         error={errors.pageCount}
         onChange={(event) => {
           setPageCount(event.target.value)
+        }}
+      />
+
+      <TextField
+        id="edition-cover"
+        label="Обкладинка (посилання)"
+        type="url"
+        hint="Посилання на зображення обкладинки."
+        value={coverUrl}
+        error={errors.coverUrl}
+        onChange={(event) => {
+          setCoverUrl(event.target.value)
         }}
       />
 

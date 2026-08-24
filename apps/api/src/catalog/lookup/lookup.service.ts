@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common'
 import { API_ERROR_CODES, bookLookupResultSchema, type BookLookupResult } from '@bookswap/shared'
 import { ApiException } from '../../common/api.exception'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -21,6 +21,8 @@ class LookupTimeoutError extends Error {}
  */
 @Injectable()
 export class LookupService {
+  private readonly logger = new Logger(LookupService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject(BOOK_LOOKUP_PROVIDER) private readonly provider: BookLookupProvider,
@@ -37,14 +39,37 @@ export class LookupService {
     return result
   }
 
-  /** R3: попадання в кеш не витрачає ліміт зовнішнього провайдера. */
+  /**
+   * R3: попадання в кеш не витрачає ліміт зовнішнього провайдера.
+   *
+   * `safeParse`, не `parse`: рядок у `ExternalBookLookup` пережив запис однієї
+   * версії схеми — контракт (наприклад, звуження `language` до
+   * `languageCodeSchema`, cleanup Stage 7) може зміцніти пізніше. Історія
+   * цього конкретного поля доводить, що жоден наявний виробник payload
+   * (`OpenLibraryLookupProvider`) ніколи не писав невалідного значення (див.
+   * `lookup.service.spec.ts`), але саме сховище — не той рівень, де варто
+   * покладатись на це назавжди: рядок, що не проходить актуальну схему,
+   * трактується як cache miss — сервіс іде до провайдера й перезаписує кеш
+   * свіжим, валідним значенням, а не валить увесь запит 500-ю чи мовчки
+   * підміняє поле (`.catch({})` тут навмисно не використовується — саме це
+   * ховало б проблему, а не лікувало).
+   */
   private async readCache(isbn: string): Promise<BookLookupResult | undefined> {
     const row = await this.prisma.externalBookLookup.findUnique({ where: { isbn } })
 
     if (row === null) return undefined
     if (Date.now() - row.fetchedAt.getTime() > lookupCacheTtlMs()) return undefined
 
-    return bookLookupResultSchema.parse(row.payload)
+    const parsed = bookLookupResultSchema.safeParse(row.payload)
+
+    if (!parsed.success) {
+      this.logger.warn(
+        `Кешований запис ExternalBookLookup(${isbn}) не пройшов схему — трактую як cache miss`,
+      )
+      return undefined
+    }
+
+    return parsed.data
   }
 
   private async writeCache(isbn: string, payload: BookLookupResult): Promise<void> {

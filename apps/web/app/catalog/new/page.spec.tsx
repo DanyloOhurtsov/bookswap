@@ -3,7 +3,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
-import type { Edition, Work, WorkAuthor, WorkDetailResponse } from '@bookswap/shared'
+import type { Edition, Translation, Work, WorkAuthor, WorkDetailResponse } from '@bookswap/shared'
 import NewBookPage from './page'
 
 /**
@@ -76,6 +76,22 @@ function edition(overrides: Partial<Edition> = {}): Edition {
     format: 'HARDCOVER',
     lang: 'uk',
     translator: null,
+    ...overrides,
+  }
+}
+
+function translation(overrides: Partial<Translation> = {}): Translation {
+  return {
+    id: 'translation-1',
+    workId: 'work-1',
+    translator: 'Тестовий Перекладач',
+    lang: 'de',
+    sourceLang: 'en',
+    year: null,
+    isAbridged: false,
+    hasNotes: false,
+    notes: null,
+    editionCount: 0,
     ...overrides,
   }
 }
@@ -203,7 +219,175 @@ describe('гілка «наявне Work»', () => {
 
     expect(await screen.findByText(/тепер у вашій бібліотеці/)).toBeInTheDocument()
 
+    // Регресія: гілка «наявний Work» без lookup (текстовий пошук, не ISBN)
+    // працює так само, як і до додавання lookup-передачі нижче.
     expect(mockApiRequest).not.toHaveBeenCalledWith('/works', expect.anything())
+  })
+
+  it('lookup-чернетка доходить до нового Translation/Edition, а не губиться на виборі наявного Work', async () => {
+    let translationPayload: unknown
+    let editionPayload: unknown
+
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [candidate({ editions: [], translations: [] })],
+      }),
+      '/catalog/lookup': () => ({
+        result: {
+          title: 'Ігнорується — Work наявний',
+          authors: ['Ігнорується'],
+          publishedYear: 2001,
+          language: 'de',
+          publisher: 'Видавництво з лукапу',
+          coverUrl: 'https://example.com/cover.jpg',
+        },
+      }),
+      '/works/work-1/translations': ({ body }) => {
+        translationPayload = body
+        return { translation: translation({ id: 'translation-new', workId: 'work-1' }) }
+      },
+      '/works/work-1/editions': ({ body }) => {
+        editionPayload = body
+        return { edition: edition({ id: 'edition-new', workId: 'work-1' }) }
+      },
+      '/me/library': () => undefined,
+    })
+
+    await search(CANDIDATE_ISBN)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'У мене інше видання цього твору' }))
+
+    expect(await screen.findByText('Переклад')).toBeInTheDocument()
+    // §6.3 п.12: наявний Work не редагується повторно — жодного запиту на
+    // /works, і назва/автори з lookup ніде не показуються на цьому кроці.
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works', expect.anything())
+    expect(screen.queryByText('Ігнорується — Work наявний')).not.toBeInTheDocument()
+
+    // Мова видання з lookup — лише в полі мови ПЕРЕКЛАДУ.
+    expect(screen.getByLabelText('Мова перекладу')).toHaveValue('de')
+    expect(screen.getByLabelText('З якої мови перекладено')).toHaveValue('')
+
+    await user.type(screen.getByLabelText('З якої мови перекладено'), 'en')
+    await user.type(screen.getByLabelText('Перекладач'), 'Новий Перекладач')
+    await user.click(screen.getByRole('button', { name: 'Далі: видання' }))
+
+    expect(await screen.findByText('Видання')).toBeInTheDocument()
+    expect(screen.getByLabelText('Рік видання')).toHaveValue(2001)
+    expect(screen.getByLabelText('Видавництво')).toHaveValue('Видавництво з лукапу')
+    expect(screen.getByLabelText('Обкладинка (посилання)')).toHaveValue(
+      'https://example.com/cover.jpg',
+    )
+    expect(screen.getByLabelText('ISBN-13')).toHaveValue(CANDIDATE_ISBN)
+
+    // Ручна правка після lookup зберігається — наступний рендер її не затирає.
+    await user.clear(screen.getByLabelText('Видавництво'))
+    await user.type(screen.getByLabelText('Видавництво'), 'Виправлене видавництво')
+
+    await user.click(screen.getByRole('button', { name: 'Далі: мій примірник' }))
+
+    await waitFor(() => {
+      expect(translationPayload).toMatchObject({
+        translator: 'Новий Перекладач',
+        lang: 'de',
+        sourceLang: 'en',
+      })
+    })
+    expect(editionPayload).toMatchObject({
+      year: 2001,
+      publisher: 'Виправлене видавництво',
+      coverUrl: 'https://example.com/cover.jpg',
+      isbn13: CANDIDATE_ISBN,
+      translationId: 'translation-new',
+    })
+  })
+
+  it('наявний Translation можна перевикористати — новий Translation не створюється, lookup-мова його не чіпає', async () => {
+    let editionPayload: unknown
+
+    const existingTranslation = translation({
+      id: 'translation-existing',
+      workId: 'work-1',
+      translator: 'Старий Перекладач',
+      lang: 'fr',
+    })
+
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [candidate({ editions: [], translations: [existingTranslation] })],
+      }),
+      '/catalog/lookup': () => ({
+        // Мова lookup відрізняється від мови наявного перекладу — якби вона
+        // якось потрапляла на наявний запис, це було б видно в assert нижче.
+        result: { title: 'З лукапу', publishedYear: 1999, language: 'de' },
+      }),
+      '/works/work-1/editions': ({ body }) => {
+        editionPayload = body
+        return { edition: edition({ id: 'edition-new', workId: 'work-1' }) }
+      },
+      '/me/library': () => undefined,
+    })
+
+    await search(CANDIDATE_ISBN)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'У мене інше видання цього твору' }))
+
+    expect(await screen.findByText('Переклад')).toBeInTheDocument()
+    expect(
+      screen.getByText('У цього твору вже є переклади — можливо, ваш серед них.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Старий Перекладач/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Використати цей переклад' }))
+
+    expect(await screen.findByText('Видання')).toBeInTheDocument()
+    // Дані видання все одно підставляються з lookup — лише мова переклад не
+    // чіпається (наявний Translation не редагується цим флоу).
+    expect(screen.getByLabelText('Рік видання')).toHaveValue(1999)
+
+    await user.click(screen.getByRole('button', { name: 'Далі: мій примірник' }))
+
+    await waitFor(() => {
+      expect(editionPayload).toMatchObject({ translationId: 'translation-existing' })
+    })
+
+    // Жодного POST на створення нового Translation — саме наявний перевикористаний.
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works/work-1/translations', expect.anything())
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works', expect.anything())
+  })
+})
+
+describe('гілка «наявне Edition» — lookup не впливає', () => {
+  it('lookup успішний, але гілка «наявне Edition» все одно створює лише Copy', async () => {
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [
+          candidate({ editions: [edition({ id: 'edition-match', isbn13: CANDIDATE_ISBN })] }),
+        ],
+      }),
+      '/catalog/lookup': () => ({
+        result: { title: 'Не повинно нікуди потрапити', publishedYear: 2001, language: 'de' },
+      }),
+      '/me/library': ({ body }) => {
+        expect(body).toMatchObject({ editionId: 'edition-match' })
+        return undefined
+      },
+    })
+
+    await search(CANDIDATE_ISBN)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+
+    expect(await screen.findByText('Ваш примірник')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+
+    expect(await screen.findByText(/тепер у вашій бібліотеці/)).toBeInTheDocument()
+
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works', expect.anything())
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works/work-1/translations', expect.anything())
+    expect(mockApiRequest).not.toHaveBeenCalledWith('/works/work-1/editions', expect.anything())
   })
 })
 
@@ -268,7 +452,11 @@ describe('гілка «немає збігів»', () => {
 
     expect(await screen.findByText('Твір')).toBeInTheDocument()
     expect(screen.getByLabelText('Назва твору')).toHaveValue('З лукапу')
-    expect(screen.getByLabelText('Рік першого видання')).toHaveValue(2001)
+
+    // §6.3 п.2–3: рік ISBN-видання — це Edition.year, не Work.firstPubYear.
+    // Провайдер не дає окремого work-level поля, тож рік першої публікації
+    // твору лишається порожнім і редагованим руками.
+    expect(screen.getByLabelText('Рік першого видання')).toHaveValue(null)
 
     const authorNames = screen.getAllByLabelText('Імʼя')
     expect(authorNames.map((input) => (input as HTMLInputElement).value)).toEqual([
@@ -280,6 +468,80 @@ describe('гілка «немає збігів»', () => {
     await user.clear(screen.getByLabelText('Назва твору'))
     await user.type(screen.getByLabelText('Назва твору'), 'Виправлена назва')
     expect(screen.getByLabelText('Назва твору')).toHaveValue('Виправлена назва')
+  })
+
+  it('рік видання, видавництво, обкладинка й мова з lookup доходять до Translation/Edition — не до Work', async () => {
+    let editionPayload: unknown
+
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({ candidates: [] }),
+      '/catalog/lookup': () => ({
+        result: {
+          title: 'З лукапу',
+          authors: ['Автор Один'],
+          publishedYear: 2001,
+          language: 'de',
+          publisher: 'Видавництво з лукапу',
+          coverUrl: 'https://example.com/cover.jpg',
+        },
+      }),
+      '/works': () => ({
+        work: work({ id: 'work-new', title: 'З лукапу' }),
+        authors: [],
+        translations: [],
+        editions: [],
+      }),
+      '/works/work-new/translations': () => ({
+        translation: translation({ id: 'translation-new', workId: 'work-new' }),
+      }),
+      '/works/work-new/editions': ({ body }) => {
+        editionPayload = body
+        return { edition: edition({ id: 'edition-new', workId: 'work-new' }) }
+      },
+      '/me/library': () => undefined,
+    })
+
+    await search(CANDIDATE_ISBN)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Створити новий твір' }))
+
+    expect(await screen.findByText('Твір')).toBeInTheDocument()
+    // Work-крок не отримує ні року видання, ні мови видання — жодного поля
+    // "мова" на цьому кроці взагалі немає під підказкою lookup.
+    expect(screen.getByLabelText('Рік першого видання')).toHaveValue(null)
+
+    await user.click(screen.getByRole('button', { name: 'Далі: переклад' }))
+
+    expect(await screen.findByText('Переклад')).toBeInTheDocument()
+    // §6.3 п.7: мова ISBN-видання автозаповнює саме мову перекладу…
+    expect(screen.getByLabelText('Мова перекладу')).toHaveValue('de')
+    // …і ніколи мову джерела: поле лишається порожнім, доки його явно не заповнять.
+    expect(screen.getByLabelText('З якої мови перекладено')).toHaveValue('')
+    await user.type(screen.getByLabelText('З якої мови перекладено'), 'en')
+    await user.type(screen.getByLabelText('Перекладач'), 'Тестовий Перекладач')
+    await user.click(screen.getByRole('button', { name: 'Далі: видання' }))
+
+    expect(await screen.findByText('Видання')).toBeInTheDocument()
+    expect(screen.getByLabelText('Рік видання')).toHaveValue(2001)
+    expect(screen.getByLabelText('Видавництво')).toHaveValue('Видавництво з лукапу')
+    expect(screen.getByLabelText('Обкладинка (посилання)')).toHaveValue(
+      'https://example.com/cover.jpg',
+    )
+
+    // Редагування після lookup не відкочується наступним рендером.
+    await user.clear(screen.getByLabelText('Видавництво'))
+    await user.type(screen.getByLabelText('Видавництво'), 'Виправлене видавництво')
+
+    await user.click(screen.getByRole('button', { name: 'Далі: мій примірник' }))
+
+    await waitFor(() => {
+      expect(editionPayload).toMatchObject({
+        year: 2001,
+        publisher: 'Виправлене видавництво',
+        coverUrl: 'https://example.com/cover.jpg',
+      })
+    })
   })
 })
 

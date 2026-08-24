@@ -38,4 +38,10 @@ describe('bookLookupResultSchema', () => {
 
     expect(bookLookupResultSchema.parse(full)).toEqual(full)
   })
+
+  it('відхиляє мову, що не є кодом ISO 639-1 (§6.3 п.7: не підміняти невідоме значення)', () => {
+    expect(bookLookupResultSchema.safeParse({ title: 'Шантарам', language: 'eng' }).success).toBe(
+      false,
+    )
+  })
 })
