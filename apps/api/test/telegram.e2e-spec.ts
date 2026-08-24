@@ -251,7 +251,20 @@ describe('Telegram (e2e)', () => {
       expect(token).toMatch(/^[A-Za-z0-9_-]+$/)
 
       // TTL — 10 хвилин.
-      const ttl = new Date(body.expiresAt).getTime() - Date.now()
+      //
+      // Відлік ведеться від годинника БАЗИ, а не від `Date.now()`, і це не
+      // педантизм: `TelegramLinkService` рахує `expiresAt` від
+      // `clock_timestamp()` навмисно (див. його доккоментар), а Postgres тут
+      // живе в Docker-VM, чий годинник розходиться з хостовим на десятки
+      // мілісекунд. Точна межа `<= TTL`, зміряна чужим годинником, перетворює цю
+      // розбіжність на флак: спостережено 600022 мс при межі 600000. Запит іде
+      // ПІСЛЯ відповіді, тож `ttl < TTL` тримається строго, і послаблювати межу
+      // не треба.
+      const [dbNow] = await prisma.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`
+
+      if (dbNow === undefined) throw new Error('clock_timestamp() не повернув рядка')
+
+      const ttl = new Date(body.expiresAt).getTime() - dbNow.now.getTime()
 
       expect(ttl).toBeGreaterThan(TELEGRAM_LINK_TTL_MS - 60_000)
       expect(ttl).toBeLessThanOrEqual(TELEGRAM_LINK_TTL_MS)

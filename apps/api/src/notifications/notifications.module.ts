@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
+import { BACKGROUND_MODE, DEFAULT_BACKGROUND_MODE } from '../common/background'
 import { EmailChannel } from './channels/email.channel'
 import { InAppChannel } from './channels/in-app.channel'
 import { NOTIFICATION_CHANNELS } from './channels/notification-channel'
@@ -45,6 +46,11 @@ import { NotificationsService } from './notifications.service'
       ],
       inject: [InAppChannel, EmailChannel, TelegramChannel],
     },
+    /**
+     * Розклад диспетчера й дайджесту — провайдером, а не константою прямо в
+     * сервісі: див. `common/background.ts`. Прод завжди бачить `'enabled'`.
+     */
+    { provide: BACKGROUND_MODE, useValue: DEFAULT_BACKGROUND_MODE },
   ],
   exports: [NotificationsService, NotificationDispatcher, NotificationDigestService],
 })

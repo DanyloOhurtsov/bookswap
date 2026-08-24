@@ -144,7 +144,11 @@ describe('Graceful shutdown реальної Nest application (e2e)', () => {
       },
     }
 
+    // background: true — предметом перевірки є САМ `wake()`: тест доводить, що
+    // `app.close()` чекає тик, запущений тим самим шляхом, що й у проді. За
+    // замовчуванням e2e-застосунок фону не має (див. TestAppOptions.background).
     const app = await createTestApp({
+      background: true,
       configure: (builder) => {
         builder.overrideProvider(EMAIL_SENDER).useValue(emailSender)
       },
@@ -213,7 +217,8 @@ describe('Graceful shutdown реальної Nest application (e2e)', () => {
   })
 
   it('app.close() чекає активний прохід NotificationDigestService', async () => {
-    const app = await createTestApp()
+    // Те саме, що й у тику диспетчера вище: перевіряється саме `wake()`.
+    const app = await createTestApp({ background: true })
     let closedByTest = false
 
     try {

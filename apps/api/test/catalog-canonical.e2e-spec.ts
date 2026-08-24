@@ -103,6 +103,26 @@ describe('Канонічне розв’язання Work (e2e)', () => {
     return workDetailResponseSchema.parse(response.body)
   }
 
+  /**
+   * Другий твір ТОГО САМОГО автора — за id, а не за іменем.
+   *
+   * `POST /works` авторів за іменем не дедуплікує (`CatalogService` завжди робить
+   * `author.create`), тож два виклики `createWork` з однаковим `authorName` дають
+   * ДВОХ різних авторів: один прив'язаний до дубліката, другий до канонічного.
+   * Для перевірки лічильника творів це не дрібниця, а зміна предмета: у видачі
+   * тоді два однойменні `authorMatches`, `find()` бере довільного з них, і тест
+   * зеленіє або падає залежно від порядку, у якому їх поверне пошук.
+   */
+  async function createWorkForAuthor(title: string, authorId: string): Promise<WorkDetailResponse> {
+    const response = await request(app.getHttpServer())
+      .post(url('/works'))
+      .set('Cookie', cookie)
+      .send({ title, origLang: 'uk', authors: [{ authorId }] })
+      .expect(201)
+
+    return workDetailResponseSchema.parse(response.body)
+  }
+
   async function createEdition(workId: string): Promise<string> {
     const response = await request(app.getHttpServer())
       .post(url(`/works/${workId}/editions`))
@@ -403,7 +423,10 @@ describe('Канонічне розв’язання Work (e2e)', () => {
     it('GET /catalog/search не показує змержений твір як окрему позицію', async () => {
       const token = marker()
       const source = await createWork(`Спільна назва ${token}`, `Автор ${token}`)
-      const target = await createWork(`Спільна назва ${token} канон`, `Автор ${token}`)
+      const authorId = source.authors[0]?.id ?? ''
+      // Той самий автор на обидва твори — інакше в базі їх двоє, і лічильник
+      // нижче міряв би випадкового з них. Див. `createWorkForAuthor`.
+      const target = await createWorkForAuthor(`Спільна назва ${token} канон`, authorId)
 
       await merge.merge(source.work.id, target.work.id)
 
@@ -419,10 +442,12 @@ describe('Канонічне розв’язання Work (e2e)', () => {
       expect(ids).not.toContain(source.work.id)
 
       // Автор писав один твір, а не два: `WorkAuthor` мерж не переносить, тож
-      // без фільтра лічильник рахував би й дублікат.
-      const author = authorMatches.find((match) => match.name === `Автор ${token}`)
+      // без фільтра лічильник рахував би й дублікат. Автор тут рівно один
+      // (обидва твори створені на його id), і саме тому число визначене.
+      const authors = authorMatches.filter((match) => match.name === `Автор ${token}`)
 
-      expect(author?.workCount).toBe(1)
+      expect(authors).toHaveLength(1)
+      expect(authors[0]?.workCount).toBe(1)
     })
 
     it('пошук за ISBN веде на канонічний твір, а не на змержений', async () => {

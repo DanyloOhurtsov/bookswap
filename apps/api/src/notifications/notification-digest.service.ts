@@ -1,4 +1,5 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
+import { BACKGROUND_MODE, type BackgroundMode } from '../common/background'
 import { isUniqueViolationOn } from '../common/prisma-errors'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from './notifications.service'
@@ -80,9 +81,19 @@ export class NotificationDigestService implements OnModuleInit, OnModuleDestroy 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    /**
+     * Замовчування діє лише для ручного `new` — так §7.5-тест нижче будує
+     * свіжий сервіс і доводить, що перший прохід стається саме на
+     * `onModuleInit`. Nest завжди передає значення з провайдера.
+     */
+    @Inject(BACKGROUND_MODE) private readonly background: BackgroundMode = 'enabled',
   ) {}
 
   onModuleInit(): void {
+    // Вимкнений режим не заводить ні таймера, ні негайного проходу: в e2e
+    // дайджест сканує всі HANDED_OVER-лоани спільної бази, тобто чужі.
+    if (this.background === 'disabled') return
+
     // Той самий прийом, що в `NotificationDispatcher`: інтервал лише
     // сигналізує через `trigger()`, а не привласнює `inFlight` напряму. Пряме
     // присвоєння дало б перезапис активної роботи вже виконаною обіцянкою
@@ -134,6 +145,11 @@ export class NotificationDigestService implements OnModuleInit, OnModuleDestroy 
   }
 
   private trigger(): void {
+    // Той самий вимикач, що й у `NotificationDispatcher`, і в тій самій єдиній
+    // крапці входу: разом з інтервалом він закриває і `wake()`. Публічний
+    // `run(now)` лишається робочим — саме ним користуються тести дайджесту.
+    if (this.background === 'disabled') return
+
     if (this.stopping || this.running) return
 
     this.inFlight = this.run()

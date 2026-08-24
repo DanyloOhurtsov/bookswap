@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { notificationPayloadSchema, type Channel } from '@bookswap/shared'
+import { BACKGROUND_MODE, type BackgroundMode } from '../common/background'
 import { PrismaService } from '../prisma/prisma.service'
 import { NOTIFICATION_CHANNELS } from './channels/notification-channel'
 import { isTerminalFailure, nextAttemptAfterFailure } from './delivery-backoff'
@@ -109,11 +110,22 @@ export class NotificationDispatcher implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     @Inject(NOTIFICATION_CHANNELS) channels: readonly NotificationChannelSender[],
+    /**
+     * Замовчування діє ЛИШЕ для ручного `new` (тести будують «другий процес»
+     * саме так) — Nest завжди передає значення з провайдера, а якщо той зникне
+     * з модуля, DI впаде голосно, а не тихо підставить `'enabled'`.
+     */
+    @Inject(BACKGROUND_MODE) private readonly background: BackgroundMode = 'enabled',
   ) {
     this.senders = new Map(channels.map((sender) => [sender.channel, sender]))
   }
 
   onModuleInit(): void {
+    // Вимкнений режим не заводить таймера взагалі, а не лишає його тикати в
+    // порожній `trigger()`: тридцять п'ять e2e-файлів дали б тридцять п'ять
+    // таймерів, які нічого не роблять, зате з'являються в кожному дампі.
+    if (this.background === 'disabled') return
+
     // НЕ `this.inFlight = this.run()`: якщо тик, запущений попереднім тиком
     // таймера, ще працює, прямий виклик перезаписав би `inFlight` щойно
     // отриманою — уже виконаною — обіцянкою від `run()`'s раннього виходу
@@ -161,6 +173,13 @@ export class NotificationDispatcher implements OnModuleInit, OnModuleDestroy {
    * працює, і `onModuleDestroy` чекав би не на нього.
    */
   private trigger(): void {
+    // Єдина крапка входу — тому вимикач стоїть саме тут: разом з інтервалом він
+    // закриває і `wake()` (§7.3, поштовх після коміту), тобто другий, незалежний
+    // від розкладу шлях, яким прохід стартував би посеред чужого e2e-файлу.
+    // Публічний `run()` цього не бачить і лишається повністю робочим: тест, якому
+    // прохід потрібен по суті, кличе його явно.
+    if (this.background === 'disabled') return
+
     if (this.stopping) return
 
     if (this.running) {
