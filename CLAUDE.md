@@ -34,6 +34,23 @@ Do not introduce Redis, JWT, GraphQL, or microservices.
 - Never suppress a TypeScript, ESLint, or test error — fix the cause.
 - No speculative abstractions. Build what the current stage needs.
 
+## Tests
+
+- e2e files share one database and one process. Background schedulers
+  (`NotificationDispatcher`, `NotificationDigestService`, `SessionCleanupService`) are
+  therefore off by default there: `createTestApp()` overrides `BACKGROUND_MODE`, which
+  disables both the interval and `wake()`. Never re-enable them by deleting a service from
+  `AppModule` — `createTestApp()` must stay the same app as `main.ts`.
+- A test that needs a delivery pass calls `run()` explicitly. Use
+  `createTestApp({ background: true })` only where `wake()` itself is the subject.
+- Invariant across file boundaries: no non-terminal `NotificationDelivery` rows survive a
+  file. `test/e2e-setup.ts` enforces it — it fails the next file loudly instead of leaking.
+- `createTestApp()` calls `app.listen(0)`, not `app.init()`: one listener per file. Never let
+  supertest open and close a listener per request. This is backed by measurement, not by a
+  proven mechanism — transport-class failures (`socket hang up`, `Parse Error`, 401 from a
+  route that has no guard) went from 3 of 14 runs to 0 of 12. Keep-alive is NOT the cause:
+  superagent defaults to `agent: false`, and `http.globalAgent` gets no sockets at all.
+
 ## Workflow
 
 - Work on the branch named in the stage prompt. Check with `git branch --show-current`;
