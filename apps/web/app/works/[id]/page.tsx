@@ -17,11 +17,13 @@ import { AuthorLine, Chip, EditionLine } from '../../components/book'
 import { SelectField, TextField } from '../../components/form-field'
 import { FormStatus } from '../../components/form-status'
 import { HistoryEntryLine } from '../../components/history'
+import { WishlistButton } from '../../components/wishlist-button'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../lib/labels'
 import { useWork } from '../../lib/use-catalog'
 import { useWorkHistory } from '../../lib/use-history'
 import { useSession } from '../../lib/use-session'
+import { useWishlist } from '../../lib/use-wishlist'
 import { validate, type FieldErrors } from '../../lib/validation'
 
 /**
@@ -39,11 +41,26 @@ export default function WorkPage() {
   const router = useRouter()
   const { state: session, reload: reloadSession } = useSession()
   const workId = parameters.id
-  const { state, reload } = useWork(workId)
+  const { state, reload, canonicalWorkId } = useWork(workId)
+  const wishlist = useWishlist()
 
   useEffect(() => {
     if (session.status === 'guest') router.replace('/login')
   }, [session.status, router])
+
+  /**
+   * §6.3: reading a merged work answers 301 on the canonical one, and `fetch`
+   * follows it — so the data below is already right, and only the address bar
+   * is stale. Left alone it is the stale part that spreads: the URL people copy
+   * out of it, bookmark and paste into chats would keep pointing at a duplicate
+   * whose page is empty of everything but a title.
+   *
+   * `replace`, not `push`: the merged id is not a place worth being able to
+   * navigate back to.
+   */
+  useEffect(() => {
+    if (canonicalWorkId !== null) router.replace(`/works/${encodeURIComponent(canonicalWorkId)}`)
+  }, [canonicalWorkId, router])
 
   if (session.status === 'loading' || state.status === 'loading') {
     return (
@@ -97,6 +114,8 @@ export default function WorkPage() {
         <AuthorLine authors={authors} />
       </p>
 
+      <WishlistButton work={work} authors={authors} wishlist={wishlist} />
+
       <dl className="facts">
         <dt>Мова оригіналу</dt>
         <dd>{work.origLang}</dd>
@@ -140,7 +159,8 @@ export default function WorkPage() {
 
       <p className="form__aside">
         <Link href={`/catalog/new?workId=${work.id}`}>Додати переклад або видання</Link> ·{' '}
-        <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link>
+        <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
+        <Link href="/wishlist">Вішлист</Link>
       </p>
     </main>
   )

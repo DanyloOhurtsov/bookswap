@@ -73,3 +73,43 @@ export function isUniqueViolationOn(error: unknown, constraint: string): boolean
 
   return driverMessage(error)?.includes(`"${constraint}"`) ?? false
 }
+
+/**
+ * PostgreSQL SQLSTATE, коли його бачить драйвер — не Prisma-код.
+ *
+ * `originalCode`, як і `originalMessage`, живе в `meta.driverAdapterError.cause`
+ * (див. коментар над `driverMessage`).
+ */
+function driverCode(error: unknown): string | undefined {
+  const cause = property(property(property(error, 'meta'), 'driverAdapterError'), 'cause')
+  const code = property(cause, 'originalCode')
+
+  return typeof code === 'string' ? code : undefined
+}
+
+/**
+ * Дедлок (40P01) чи serialization failure (40001) — обидва мають однакову
+ * відповідь: почати транзакцію заново.
+ *
+ * Верхній Prisma-код тут **навмисно не перевіряється**: емпірично (пряма
+ * провокація дедлоку на живій базі, дві незалежні транзакції, які лочать ті
+ * самі два рядки у зворотному порядку) той самий дедлок дає РІЗНИЙ Prisma-код
+ * залежно від того, яка саме операція його спіймала — `P2010` для сирого
+ * `$queryRaw`, `P2039` для `tx.user.update()`. Єдине стабільне поле в обох
+ * випадках — `meta.driverAdapterError.cause.originalCode` = `'40P01'`
+ * (SQLSTATE від самого PostgreSQL), тому саме воно тут і читається, а не
+ * `error.code`. `test/db/prisma-errors.db-spec.ts` пінує цю форму живим дедлоком
+ * так само, як live-DB тести `isUniqueViolationOn` пінують назви обмежень.
+ */
+export function isDeadlockOrSerializationFailure(error: unknown): boolean {
+  const code = driverCode(error)
+
+  if (code === '40P01' || code === '40001') return true
+
+  const message = driverMessage(error)
+
+  return (
+    message !== undefined &&
+    (message.includes('deadlock detected') || message.includes('could not serialize access'))
+  )
+}

@@ -1,0 +1,36 @@
+import 'reflect-metadata'
+import { plainToInstance } from 'class-transformer'
+import { validateSync } from 'class-validator'
+import { searchCandidatesRequestSchema } from '@bookswap/shared'
+import { SearchCandidatesQueryDto } from './search-candidates-query.dto'
+
+/**
+ * Той самий тест парності, що й для `CatalogSearchDto` (`catalog.dto.spec.ts`):
+ * §11 вимагає і zod, і class-validator, і обидва мусять сходитись у вироку.
+ */
+function acceptedByDto(payload: unknown): boolean {
+  const instance = plainToInstance(SearchCandidatesQueryDto, payload)
+
+  return validateSync(instance, { whitelist: true, forbidNonWhitelisted: true }).length === 0
+}
+
+describe('SearchCandidatesQueryDto ↔ searchCandidatesRequestSchema', () => {
+  it.each([
+    { name: 'валідний запит за назвою', payload: { q: 'Шантарам' }, valid: true },
+    { name: 'валідний ISBN у тому самому полі', payload: { q: '9783161484100' }, valid: true },
+    { name: 'один символ — закороткий', payload: { q: 'ш' }, valid: false },
+    { name: 'порожній рядок', payload: { q: '' }, valid: false },
+    { name: 'відсутнє поле q', payload: {}, valid: false },
+  ])('$name', ({ payload, valid }) => {
+    const byZod = searchCandidatesRequestSchema.safeParse(payload).success
+    const byDto = acceptedByDto(payload)
+
+    expect({ byZod, byDto }).toEqual({ byZod: valid, byDto: valid })
+  })
+
+  it('обрізає зайві пробіли так само, як схема', () => {
+    const instance = plainToInstance(SearchCandidatesQueryDto, { q: '  Шантарам  ' })
+
+    expect(instance.q).toBe('Шантарам')
+  })
+})

@@ -69,6 +69,39 @@ export const API_ERROR_CODES = {
    * примірника редагується завжди.
    */
   COPY_STATUS_LOCKED: 'COPY_STATUS_LOCKED',
+  /**
+   * The addressed `Work` was merged into another one (§6.3, R4).
+   *
+   * One code, two statuses. Reads answer 301 with a `Location` header, as §6.3
+   * requires. Writes answer 409 instead: silently retargeting a POST to a record
+   * the client never named would hide the move from the only party that can
+   * decide whether it still wants to write there.
+   *
+   * `details.canonicalWorkId` carries the work to use instead — the point of a
+   * dedicated code is that the client can retarget itself rather than show an
+   * error.
+   */
+  WORK_MERGED: 'WORK_MERGED',
+
+  // --- ISBN lookup (§6.3, §11, docs/plan/stage-7.md 7b) -----------------------
+  /**
+   * Зовнішній провайдер не знає такого ISBN (HTTP 404). Окремий код від
+   * загального `NOT_FOUND`: тут немає локального ресурсу, є лише порожня
+   * відповідь стороннього API — клієнт має пропонувати ручне заповнення форми,
+   * а не «перевірте адресу».
+   */
+  CATALOG_LOOKUP_NOT_FOUND: 'CATALOG_LOOKUP_NOT_FOUND',
+  /**
+   * Зовнішній провайдер відповів помилкою або незрозумілим тілом (HTTP 502).
+   * Не 500: це збій чужого сервісу, а не нашого коду, і клієнт має пропонувати
+   * ручне заповнення форми, а не показувати «щось зламалося в нас».
+   */
+  CATALOG_LOOKUP_PROVIDER_ERROR: 'CATALOG_LOOKUP_PROVIDER_ERROR',
+  /**
+   * Зовнішній провайдер не відповів у межах таймауту (HTTP 504,
+   * `CATALOG_LOOKUP_TIMEOUT_MS`, дефолт 5с — див. `.env.example`).
+   */
+  CATALOG_LOOKUP_TIMEOUT: 'CATALOG_LOOKUP_TIMEOUT',
 
   // --- Позичання (§5, §8) ----------------------------------------------------
   /** Запит на позичання власного примірника (HTTP 400). Інваріант §5.3.4. */
@@ -107,6 +140,22 @@ export const API_ERROR_CODES = {
    * стати доменною помилкою, а не 500.
    */
   LOAN_ALREADY_APPROVED: 'LOAN_ALREADY_APPROVED',
+
+  // --- Зовнішні канали сповіщень (§7.2, §7.4) --------------------------------
+  /**
+   * Бот не налаштований на цьому середовищі (HTTP 503): немає
+   * `TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_USERNAME`, тож deep link нема з чого
+   * зібрати. Окремий код, бо це не помилка користувача й не «спробуйте пізніше»,
+   * а відсутня конфігурація — UI має сховати кнопку, а не показати відмову.
+   */
+  TELEGRAM_NOT_CONFIGURED: 'TELEGRAM_NOT_CONFIGURED',
+  /**
+   * Спроба відв'язати Telegram, якого не було, або ввімкнути канал `TELEGRAM`
+   * для акаунта без `chat_id` (HTTP 409). Створювати `NotificationDelivery` у
+   * нікуди не можна: рядок п'ять разів невдало спробував би надіслати й ліг би
+   * у `FAILED`, вдаючи збій каналу замість відсутньої прив'язки.
+   */
+  TELEGRAM_NOT_LINKED: 'TELEGRAM_NOT_LINKED',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]

@@ -44,10 +44,27 @@ export {
   type OpenLoanStatus,
 } from './domain/loan'
 export {
+  DIGEST_NOTIFICATION_TYPE,
+  FLOW_CRITICAL_NOTIFICATION_TYPE,
+  IMMEDIATE_NOTIFICATION_TYPE,
   NOTIFICATION_TYPE,
+  defaultPreferenceEnabled,
+  isDigestNotificationType,
   notificationTypeSchema,
+  type DigestNotificationType,
   type NotificationType,
 } from './domain/notification'
+export {
+  CHANNEL,
+  DELIVERY_STATUS,
+  PREFERENCE_CHANNEL,
+  channelSchema,
+  deliveryStatusSchema,
+  preferenceChannelSchema,
+  type Channel,
+  type DeliveryStatus,
+  type PreferenceChannel,
+} from './domain/channel'
 export { LANGUAGE_CODES, isLanguageCode, languageCodeSchema } from './domain/language'
 export { isValidIsbn13, isbn13Schema, normalizeIsbn13 } from './domain/isbn'
 export {
@@ -122,6 +139,7 @@ export {
   CATALOG_LIMITS,
   CATALOG_MATCH_KINDS,
   CATALOG_SEARCH_LIMIT,
+  SEARCH_CANDIDATES_LIMIT,
   authorMatchSchema,
   catalogMatchKindSchema,
   catalogSearchRequestSchema,
@@ -133,12 +151,15 @@ export {
   editionDetailResponseSchema,
   editionResponseSchema,
   editionSchema,
+  searchCandidatesRequestSchema,
+  searchCandidatesResponseSchema,
   translationListResponseSchema,
   translationResponseSchema,
   translationSchema,
   workAuthorInputSchema,
   workAuthorSchema,
   workDetailResponseSchema,
+  workMergedDetailsSchema,
   workSchema,
   type AuthorMatch,
   type CatalogMatchKind,
@@ -151,6 +172,8 @@ export {
   type Edition,
   type EditionDetailResponse,
   type EditionResponse,
+  type SearchCandidatesRequest,
+  type SearchCandidatesResponse,
   type Translation,
   type TranslationListResponse,
   type TranslationResponse,
@@ -158,6 +181,7 @@ export {
   type WorkAuthor,
   type WorkAuthorInput,
   type WorkDetailResponse,
+  type WorkMergedDetails,
 } from './contracts/catalog'
 export {
   LIBRARY_LIMITS,
@@ -232,17 +256,49 @@ export {
   type WorkHistoryResponse,
 } from './contracts/history'
 export {
+  NOTIFICATION_PREFERENCE_LIMITS,
+  channelAvailabilitySchema,
+  notificationChannelsSchema,
   notificationListResponseSchema,
   notificationPayloadSchema,
+  notificationPreferenceSchema,
+  notificationPreferencesResponseSchema,
   notificationQueryRequestSchema,
   notificationResponseSchema,
   notificationSchema,
   readAllResponseSchema,
+  telegramLinkResponseSchema,
   unreadFlagSchema,
+  updateNotificationPreferencesRequestSchema,
+  type ChannelAvailability,
   type Notification,
+  type NotificationChannels,
   type NotificationListResponse,
   type NotificationPayload,
+  type NotificationPreference,
+  type NotificationPreferencesResponse,
   type NotificationQueryRequest,
   type NotificationResponse,
   type ReadAllResponse,
+  type TelegramLinkResponse,
+  type UpdateNotificationPreferencesRequest,
 } from './contracts/notification'
+export {
+  bookLookupRequestSchema,
+  bookLookupResponseSchema,
+  bookLookupResultSchema,
+  type BookLookupRequest,
+  type BookLookupResponse,
+  type BookLookupResult,
+} from './contracts/lookup'
+export {
+  WISHLIST_LIMITS,
+  addWishlistItemRequestSchema,
+  wishlistItemResponseSchema,
+  wishlistItemSchema,
+  wishlistResponseSchema,
+  type AddWishlistItemRequest,
+  type WishlistItem,
+  type WishlistItemResponse,
+  type WishlistResponse,
+} from './contracts/wishlist'

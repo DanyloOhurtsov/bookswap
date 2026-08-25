@@ -234,6 +234,11 @@ export class LoanService {
 
     this.logger.log(`Лоан ${loan.id}: — → REQUESTED, актор ${borrowerId}`)
 
+    // §7.3: «після коміту: подія». Тут, а не в `create`, бо всередині транзакції
+    // «після коміту» не існує: поштовх, надісланий звідти, розбудив би диспетчер
+    // на рядки, яких ще ніхто, крім цієї транзакції, не бачить.
+    this.notifications.dispatchSoon()
+
     return { loan: toLoan(loan) }
   }
 
@@ -277,6 +282,10 @@ export class LoanService {
           ? ''
           : `; авто-відхилено конкурентів: ${outcome.rejectedRivalIds.join(', ')}`),
     )
+
+    // §7.3: «після коміту: подія». Один поштовх на весь перехід — авто-відхилення
+    // конкурентів могло створити ще кілька сповіщень, і всі вони вже в базі.
+    this.notifications.dispatchSoon()
 
     return { loan: toLoan(outcome.loan) }
   }
@@ -499,8 +508,24 @@ export class LoanService {
   }
 }
 
-/** Прив'язка Prisma-клієнта транзакції: усі моделі плюс сирі запити. */
-type TransactionClient = Pick<PrismaService, 'loan' | 'copy' | 'notification' | '$queryRaw'>
+/**
+ * Прив'язка Prisma-клієнта транзакції: усі моделі плюс сирі запити.
+ *
+ * Моделі сповіщень тут не тому, що стейт-машина про них щось знає, а тому, що
+ * `NotificationsService.create` пише в тій самій транзакції (§7.3, правило 1) —
+ * і разом із подією складає рядки її доставки. Перелік звужений навмисно: він
+ * показує, до чого перехід має право торкатися.
+ */
+type TransactionClient = Pick<
+  PrismaService,
+  | 'loan'
+  | 'copy'
+  | 'notification'
+  | 'notificationDelivery'
+  | 'notificationPreference'
+  | 'user'
+  | '$queryRaw'
+>
 
 interface LoanSides {
   ownerId: string

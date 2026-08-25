@@ -146,6 +146,30 @@ describe('унікальні обмеження §4', () => {
     expect(await prisma.notificationPreference.count({ where: { userId } })).toBe(2)
   })
 
+  /**
+   * §4.7 «один користувач — один відгук на твір» після R5 тримає не суцільний
+   * unique, а частковий `one_active_review_per_work_user`. Правило те саме, поки
+   * рецензія активна; архівна копія — та, що програла мерж, — під нього не
+   * підпадає, інакше §6.3 довелося б видаляти чужий текст.
+   */
+  it('Review — один АКТИВНИЙ відгук на (твір, користувач), архівні не рахуються (§4.7, R5)', async () => {
+    const graph = await createGraph(prisma)
+    const review = { workId: graph.workId, userId: graph.ownerId, rating: 5 }
+
+    const active = await prisma.review.create({ data: review })
+
+    await expectRejection(prisma.review.create({ data: review }), /workId|userId/)
+
+    // Той самий рядок, але заархівований мержем, співіснує з активним.
+    await prisma.review.create({
+      data: { ...review, archivedAt: new Date(), archivedByMergeSourceId: graph.workId },
+    })
+
+    expect(await prisma.review.count({ where: { workId: graph.workId } })).toBe(2)
+    expect(await prisma.review.count({ where: { workId: graph.workId, archivedAt: null } })).toBe(1)
+    expect(active.archivedAt).toBeNull()
+  })
+
   it('TelegramLinkToken — токен є первинним ключем (§7.4)', async () => {
     const userId = await createUser(prisma)
     const token = { token: 'link-token', userId, expiresAt: new Date(Date.now() + 600_000) }

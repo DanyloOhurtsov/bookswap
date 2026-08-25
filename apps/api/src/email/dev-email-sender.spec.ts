@@ -41,18 +41,24 @@ describe('assertNotProduction', () => {
 })
 
 describe('DevEmailSender у production', () => {
-  it('не створюється — застосунок падає на старті, а не на першому листі', () => {
-    expect(() => new DevEmailSender(configWith('production'))).toThrow(
-      DevEmailSenderInProductionError,
-    )
+  /**
+   * Відмова на старті переїхала в `env.validation.ts`: `NODE_ENV=production`
+   * вимагає `EMAIL_PROVIDER=resend` (§7.2). Конструктор мовчить навмисно — із
+   * появою другого провайдера існування цього об'єкта в контейнері перестало
+   * означати його використання, і падіння тут ламало б цілком коректний прод.
+   */
+  it('створюється, бо в контейнері може лежати незадіяним', () => {
+    expect(() => new DevEmailSender(configWith('production'))).not.toThrow()
   })
 
-  it('повідомлення помилки пояснює, що робити далі', () => {
-    expect(() => new DevEmailSender(configWith('production'))).toThrow(/EmailSender/)
-    expect(() => new DevEmailSender(configWith('production'))).toThrow(/NODE_ENV=production/)
+  it('повідомлення помилки пояснює, що робити далі', async () => {
+    const sender = new DevEmailSender(configWith('production'))
+
+    await expect(sender.send(message)).rejects.toThrow(/EmailSender/)
+    await expect(sender.send(message)).rejects.toThrow(/NODE_ENV=production/)
   })
 
-  it('відмовляє і в send(), якщо екземпляр створено повз контейнер', async () => {
+  it('відмовляє в send(), навіть якщо екземпляр створено повз контейнер', async () => {
     let nodeEnv = 'development'
     const sender = new DevEmailSender({ get: () => nodeEnv } as unknown as ConfigService)
 
@@ -77,16 +83,16 @@ describe('DevEmailSender у production', () => {
     expect(sender.outbox).toHaveLength(0)
   })
 
-  it('спирається на process.env, коли конфіг мовчить', () => {
+  it('спирається на process.env, коли конфіг мовчить', async () => {
     const previous = process.env.NODE_ENV
 
     try {
       process.env.NODE_ENV = 'production'
 
       // Порожній ConfigService не має ставати способом обійти перевірку.
-      expect(() => new DevEmailSender(configWith(undefined))).toThrow(
-        DevEmailSenderInProductionError,
-      )
+      const sender = new DevEmailSender(configWith(undefined))
+
+      await expect(sender.send(message)).rejects.toThrow(DevEmailSenderInProductionError)
     } finally {
       process.env.NODE_ENV = previous
     }

@@ -1,10 +1,12 @@
 import {
   CATALOG_LIMITS,
+  SEARCH_CANDIDATES_LIMIT,
   catalogSearchRequestSchema,
   createEditionRequestSchema,
   createTranslationRequestSchema,
   createWorkRequestSchema,
   editionSchema,
+  searchCandidatesResponseSchema,
   translationSchema,
 } from './catalog'
 
@@ -159,5 +161,33 @@ describe('проєкції', () => {
 
     expect(parsed.lang).toBe('en')
     expect(parsed.translator).toBeNull()
+  })
+})
+
+describe('searchCandidatesResponseSchema', () => {
+  const workDetail = {
+    work: {
+      id: 'w-1',
+      title: 'Шантарам',
+      origLang: 'en',
+      firstPubYear: 2003,
+      description: null,
+      createdAt: new Date().toISOString(),
+    },
+    authors: [],
+    translations: [],
+    editions: [],
+  }
+
+  it('приймає кандидата у формі WorkDetailResponse', () => {
+    const parsed = searchCandidatesResponseSchema.parse({ candidates: [workDetail] })
+
+    expect(parsed.candidates[0]?.work.id).toBe('w-1')
+  })
+
+  it('не пропускає більше кандидатів, ніж SEARCH_CANDIDATES_LIMIT', () => {
+    const candidates = Array.from({ length: SEARCH_CANDIDATES_LIMIT + 1 }, () => workDetail)
+
+    expect(searchCandidatesResponseSchema.safeParse({ candidates }).success).toBe(false)
   })
 })

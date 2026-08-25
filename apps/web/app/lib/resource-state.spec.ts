@@ -1,4 +1,12 @@
-import { requestKey, schemaIdOf, visibleState, type ResourceSnapshot } from './resource-state'
+import {
+  displayDecision,
+  requestKey,
+  schemaIdOf,
+  visibleData,
+  visibleState,
+  type ResourceSnapshot,
+  type ResourceState,
+} from './resource-state'
 
 /**
  * Регресії на ідентичність запиту.
@@ -134,5 +142,144 @@ describe('visibleState', () => {
     }
 
     expect(visibleState(snapshot, after, 2)).toEqual({ status: 'loading' })
+  })
+})
+
+/**
+ * §4 дефекту UI (налаштування сповіщень): `visibleState` навмисно віддає
+ * `loading` на кожен `reload()`, а не лише на перший показ — сторінка, яка
+ * звіряється тільки зі `status`, змушена або розмонтовувати форму на кожне
+ * фонове оновлення (і губити локальний стан усередині, разом із deep link
+ * на бота), або показувати старі дані, не розрізняючи «перший показ» і
+ * «оновлюю те, що вже показано». `visibleData` — саме ця відсутня різниця.
+ */
+describe('visibleData', () => {
+  it('ready — віддає нові дані', () => {
+    const state: ResourceState<string> = { status: 'ready', data: 'нові' }
+
+    expect(visibleData(state, 'старі')).toBe('нові')
+  })
+
+  /**
+   * «Перевірити, чи спрацював Start» на ще НЕ підключеному акаунті: reload()
+   * стартував (`status: 'loading'`), а попередні дані (з `connected: false`)
+   * мають лишитися на екрані — інакше форма, разом із запрошеним deep link,
+   * зникає на секунду й губить його.
+   */
+  it('loading, є попередні дані — віддає попередні, а не порожнечу', () => {
+    const state: ResourceState<string> = { status: 'loading' }
+
+    expect(visibleData(state, 'ще чинні')).toBe('ще чинні')
+  })
+
+  it('loading, попередніх даних нема (перший запит) — undefined', () => {
+    const state: ResourceState<string> = { status: 'loading' }
+
+    expect(visibleData(state, undefined)).toBeUndefined()
+  })
+
+  it('error, є попередні дані — попередні дані все одно видно', () => {
+    const state: ResourceState<string> = { status: 'error', message: 'мережа впала' }
+
+    expect(visibleData(state, 'ще чинні')).toBe('ще чинні')
+  })
+
+  it('error, попередніх даних нема — undefined', () => {
+    const state: ResourceState<string> = { status: 'error', message: 'мережа впала' }
+
+    expect(visibleData(state, undefined)).toBeUndefined()
+  })
+})
+
+/**
+ * §5 дефекту UI (налаштування сповіщень): рішення «форма + deepLink чи
+ * помилка» зведене в одну функцію саме тому, що ці два стани раніше
+ * перевірялися нарізно й розходилися — `visibleData` уже не показувала б
+ * порожню сторінку на фоновому reload(), але сторінка все одно НІЯК не
+ * реагувала на `state.status === 'error'`, поки старі дані вже були: форма
+ * лишалася, а людина не бачила жодного натяку, що фонова перевірка не
+ * пройшла.
+ */
+describe('displayDecision', () => {
+  it('ready — дані є, не оновлюється, помилки нема', () => {
+    const state: ResourceState<string> = { status: 'ready', data: 'A' }
+
+    expect(displayDecision(state, undefined)).toEqual({
+      data: 'A',
+      refreshing: false,
+      backgroundErrorMessage: undefined,
+    })
+  })
+
+  /**
+   * «Я натиснув Start — перевірити», поки ще НЕ підключено: reload()
+   * стартував (`loading`), попередні дані (`connected: false`) мають
+   * лишитися — форма й deep link не зникають, лише зʼявляється
+   * ненавʼязливий індикатор.
+   */
+  it('loading з попередніми даними — дані лишаються, refreshing=true', () => {
+    const state: ResourceState<string> = { status: 'loading' }
+
+    expect(displayDecision(state, 'ще чинні')).toEqual({
+      data: 'ще чинні',
+      refreshing: true,
+      backgroundErrorMessage: undefined,
+    })
+  })
+
+  it('loading без попередніх даних (перший запит) — нічого показувати', () => {
+    const state: ResourceState<string> = { status: 'loading' }
+
+    expect(displayDecision(state, undefined)).toEqual({
+      data: undefined,
+      refreshing: false,
+      backgroundErrorMessage: undefined,
+    })
+  })
+
+  /**
+   * Головний сценарій дефекту: фонова помилка (5xx/мережа) під час
+   * «перевірити», коли форма й deepLink уже показані. Дані лишаються (форма
+   * не розмонтовується), а `backgroundErrorMessage` несе повідомлення, яке
+   * сторінка показує ненавʼязливим банером над формою.
+   */
+  it('error з попередніми даними — дані лишаються, помилка видима', () => {
+    const state: ResourceState<string> = { status: 'error', message: 'мережа впала' }
+
+    expect(displayDecision(state, 'ще чинні')).toEqual({
+      data: 'ще чинні',
+      refreshing: false,
+      backgroundErrorMessage: 'мережа впала',
+    })
+  })
+
+  it('error без попередніх даних (перший запит провалився) — банеру нема на чому лежати', () => {
+    const state: ResourceState<string> = { status: 'error', message: 'мережа впала' }
+
+    expect(displayDecision(state, undefined)).toEqual({
+      data: undefined,
+      refreshing: false,
+      backgroundErrorMessage: undefined,
+    })
+  })
+
+  /**
+   * Наступний УСПІШНИЙ reload() сам собою прибирає помилку: `status`
+   * повертається до `'ready'`, і жодна з двох умов (`refreshing`,
+   * `backgroundErrorMessage`) більше не спрацьовує — без окремого
+   * "скинути помилку" стану чи ефекту.
+   */
+  it('ready після error — помилка зникає сама, без окремого скидання', () => {
+    const afterError = displayDecision({ status: 'error', message: 'X' }, 'дані')
+
+    expect(afterError.backgroundErrorMessage).toBe('X')
+
+    const afterRecovery = displayDecision({ status: 'ready', data: 'нові дані' }, 'дані')
+
+    expect(afterRecovery).toEqual({
+      data: 'нові дані',
+      refreshing: false,
+      backgroundErrorMessage: undefined,
+    })
   })
 })

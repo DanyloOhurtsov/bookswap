@@ -197,13 +197,20 @@ export const libraryGroupSchema = z.object({
 
 export type LibraryGroup = z.infer<typeof libraryGroupSchema>
 
-/** Те саме для чужої бібліотеки. Лічильники рахують **лише видимі** примірники. */
+/**
+ * Те саме для чужої бібліотеки. Лічильники рахують **лише видимі** примірники.
+ *
+ * `inWishlist` — §6.5: «Позначка, які з них у вішлисті користувача». Рахує
+ * сервер за твором (`Work`), а не за примірником: вішлист адресує `Work`
+ * (`WishlistItem.workId`), тож мітка одна на групу, а не на кожен `Copy`.
+ */
 export const visibleLibraryGroupSchema = z.object({
   edition: editionSchema,
   work: workSchema,
   authors: z.array(workAuthorSchema),
   copies: z.array(visibleCopySchema),
   counts: libraryCountsSchema,
+  inWishlist: z.boolean(),
 })
 
 export type VisibleLibraryGroup = z.infer<typeof visibleLibraryGroupSchema>

@@ -44,7 +44,8 @@ describe('Валідація DTO (e2e)', () => {
 
     app = moduleRef.createNestApplication<INestApplication<App>>()
     configureApp(app)
-    await app.init()
+    // Один слухач на файл — та сама причина, що й у `createTestApp()`.
+    await app.listen(0)
   })
 
   afterAll(async () => {

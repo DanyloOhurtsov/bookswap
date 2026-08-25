@@ -4,6 +4,7 @@ import type { INestApplication } from '@nestjs/common'
 import type { App } from 'supertest/types'
 import { AppModule } from '../src/app.module'
 import { configureApp } from '../src/app.setup'
+import { BACKGROUND_MODE } from '../src/common/background'
 import { DevEmailSender } from '../src/email/dev-email-sender'
 
 export interface TestAppOptions {
@@ -27,6 +28,22 @@ export interface TestAppOptions {
    * `createTestApp()` лишаються незмінними.
    */
   configure?: (builder: TestingModuleBuilder) => void
+  /**
+   * Чи працює фонова робота за розкладом (`NotificationDispatcher`,
+   * `NotificationDigestService`, `SessionCleanupService`).
+   *
+   * За замовчуванням `false`, і це головне, що робить набір детермінованим.
+   * e2e-файли ділять одну базу й один процес, а черга доставки фільтрується
+   * ГЛОБАЛЬНО (`claim()`/`reap()` дивляться лише на `status`, `nextAttemptAt` і
+   * `attempts`) — тож тик, що збігся з чужим файлом, підбирає й ретраїть чужі
+   * доставки. Вимикач закриває обидва шляхи: і таймер, і `wake()`.
+   *
+   * Сервіси при цьому лишаються в графі — `createTestApp` має бути тим самим
+   * застосунком, що й `main.ts`, а не його урізаною копією. Тест, якому прохід
+   * потрібен по суті, кличе `run()` явно; `true` тут потрібне лише там, де
+   * предметом перевірки є сам `wake()` (див. `graceful-shutdown.e2e-spec.ts`).
+   */
+  background?: boolean
 }
 
 /**
@@ -37,6 +54,7 @@ export async function createTestApp({
   withRateLimit = false,
   trustProxy = false,
   configure,
+  background = false,
 }: TestAppOptions = {}): Promise<INestApplication<App>> {
   const builder = Test.createTestingModule({ imports: [AppModule] })
 
@@ -44,13 +62,36 @@ export async function createTestApp({
     builder.overrideGuard(ThrottlerGuard).useValue({ canActivate: () => true })
   }
 
+  builder.overrideProvider(BACKGROUND_MODE).useValue(background ? 'enabled' : 'disabled')
+
   configure?.(builder)
 
   const moduleRef = await builder.compile()
   const app = moduleRef.createNestApplication<INestApplication<App>>()
 
   configureApp(app, { trustProxy })
-  await app.init()
+
+  // `listen(0)`, а не `init()`: один слухач на весь файл.
+  //
+  // Інакше слухача піднімає supertest — і закриває його після КОЖНОГО запиту
+  // (`supertest/lib/test.js`: `serverAddress()` робить `app.listen(0)`, а
+  // `end()` — `server.close()`). За прогін це тисячі циклів listen/close на
+  // ефемерних портах. Живий слухач прибирає цикл цілком: `serverAddress()`
+  // бачить готову адресу, `this._server` не виставляється, `close()` не
+  // викликається жодного разу. До `main.ts` це ще й ближче — там теж `listen()`.
+  //
+  // Чого тут НЕМАЄ і що не варто дописувати «про всяк випадок»: keep-alive.
+  // superagent за замовчуванням ходить із `agent: false`
+  // (`superagent/lib/node/index.js`), тобто без пулу з'єднань — кожен запит це
+  // окремий сокет, закритий одразу після відповіді. Зміряно прямо: за повний
+  // прогін `http.globalAgent` не отримує жодного сокета в жодному з 35 файлів.
+  //
+  // Підстава для цієї правки — вимірювання, а не доведений механізм. Падіння
+  // класу «клієнт не отримав коректної HTTP-відповіді» траплялися в 3 із 14
+  // прогонів до неї й у 0 із 12 після. Чому саме — не встановлено: найімовірніше
+  // з'єднання потрапляє на порт, чий сервер щойно зник, але прямого доказу
+  // цього немає.
+  await app.listen(0)
 
   return app
 }

@@ -122,6 +122,27 @@ describe('обʼєкти схеми поза Prisma Schema', () => {
     expect(rows[0]?.indexdef).toMatch(/HANDED_OVER/)
   })
 
+  /**
+   * R5 (docs/plan/stage-7.md, підетап 7g). Індекс частковий саме тому, що мерж
+   * двох `Work` може звести дві рецензії однієї людини на один твір: програшна
+   * отримує `archivedAt` і випадає з-під обмеження, не зникаючи з бази.
+   *
+   * Перевіряється й ВІДСУТНІСТЬ суцільного `Review_workId_userId_key`: якби його
+   * колись повернули, він забороняв би рівно те, заради чого заводився частковий,
+   * і мерж почав би падати на конфліктних рецензіях.
+   */
+  it('one_active_review_per_work_user — частковий unique замість суцільного (R5)', async () => {
+    const rows = await prisma.$queryRaw<{ indexname: string; indexdef: string }[]>`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE indexname IN ('one_active_review_per_work_user', 'Review_workId_userId_key')
+    `
+
+    expect(rows.map((row) => row.indexname)).toEqual(['one_active_review_per_work_user'])
+    expect(rows[0]?.indexdef).toMatch(/CREATE UNIQUE INDEX/)
+    expect(rows[0]?.indexdef).toMatch(/"workId", "userId"/)
+    expect(rows[0]?.indexdef).toMatch(/WHERE \("archivedAt" IS NULL\)/)
+  })
+
   it('CHECK-обмеження Friendship існують (§4.3, §5.3.5)', async () => {
     const rows = await prisma.$queryRaw<{ conname: string; definition: string }[]>`
       SELECT conname, pg_get_constraintdef(oid) AS definition

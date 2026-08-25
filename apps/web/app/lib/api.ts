@@ -33,11 +33,32 @@ export class ApiRequestError extends Error {
 }
 
 interface RequestOptions<T> {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  // `PUT` — заради `PUT /me/notification-preferences` (§8): клієнт надсилає стан
+  // клітинок матриці, а не інструкцію їх змінити, і повторний однаковий запит
+  // нічого не змінює.
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
   /** Схема з `@bookswap/shared`, якою розбирається успішна відповідь. */
   schema?: ZodType<T>
   signal?: AbortSignal
+}
+
+/**
+ * A response together with the one transport fact the caller may need: whether
+ * it arrived through a redirect.
+ *
+ * §6.3 answers 301 on a `Work` that was merged away, and `fetch` follows that
+ * silently — the parsed body is already the canonical work. Silence is exactly
+ * the problem: the page would render the right book under the old URL, and the
+ * next person to copy that URL out of the address bar would spread a dead link.
+ * `redirected` is what lets the page rewrite it.
+ *
+ * The canonical id itself is NOT read back out of the URL — it is in the parsed
+ * body, typed by the shared contract. This flag only says that a move happened.
+ */
+export interface ApiResponse<T> {
+  data: T
+  redirected: boolean
 }
 
 /**
@@ -46,10 +67,10 @@ interface RequestOptions<T> {
  * `credentials: 'include'` обов'язковий: автентифікація тримається на кукі (§6.1),
  * і без цього прапорця fetch її просто не надсилає.
  */
-export async function apiRequest<T = void>(
+export async function apiRequestWithRedirect<T = void>(
   path: string,
   { method = 'GET', body, schema, signal }: RequestOptions<T> = {},
-): Promise<T> {
+): Promise<ApiResponse<T>> {
   const response = await fetch(`${API_URL}${API_PREFIX}${path}`, {
     method,
     credentials: 'include',
@@ -59,7 +80,9 @@ export async function apiRequest<T = void>(
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
-  if (response.status === 204) return undefined as T
+  const redirected = response.redirected
+
+  if (response.status === 204) return { data: undefined as T, redirected }
 
   const payload: unknown = await response.json().catch(() => undefined)
 
@@ -74,7 +97,7 @@ export async function apiRequest<T = void>(
     )
   }
 
-  if (schema === undefined) return undefined as T
+  if (schema === undefined) return { data: undefined as T, redirected }
 
   const parsed = schema.safeParse(payload)
 
@@ -82,7 +105,17 @@ export async function apiRequest<T = void>(
     throw new Error('Відповідь API не відповідає спільному контракту')
   }
 
-  return parsed.data
+  return { data: parsed.data, redirected }
+}
+
+/** The common case: the body is all the caller wants. */
+export async function apiRequest<T = void>(
+  path: string,
+  options: RequestOptions<T> = {},
+): Promise<T> {
+  const { data } = await apiRequestWithRedirect<T>(path, options)
+
+  return data
 }
 
 /** Мережа лягла — це не помилка API, і повідомлення має бути іншим. */

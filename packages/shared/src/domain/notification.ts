@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { PreferenceChannel } from './channel'
 
 /**
  * §4.8, enum `NotificationType`.
@@ -31,3 +32,85 @@ export const NOTIFICATION_TYPE = [
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPE)
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>
+
+/**
+ * §7.5, перша група: надсилається негайно, щойно подія сталася.
+ *
+ * Це рівно ті типи, які породжують переходи §5.1 і дружба §6.2 — тобто ті, що
+ * створюються в транзакції разом зі зміною стану.
+ */
+export const IMMEDIATE_NOTIFICATION_TYPE = [
+  'LOAN_REQUESTED',
+  'LOAN_APPROVED',
+  'LOAN_REJECTED',
+  'LOAN_CANCELLED',
+  'LOAN_HANDED_OVER',
+  'LOAN_RETURNED',
+  'FRIEND_REQUESTED',
+  'FRIEND_ACCEPTED',
+] as const
+
+/**
+ * §7.5, друга група: тільки щоденним дайджестом.
+ *
+ * «Другу групу не можна дозволяти надсилати негайно: активний користувач
+ * перетворить бота на спам, і його вимкнуть разом із важливими сповіщеннями.»
+ * Розділення тут не декоративне — воно каже, **хто** має право створювати ці
+ * рядки: не стейт-машина, а щоденна задача. `Loan.status` при цьому не
+ * змінюється (§5.2: «`OVERDUE` — не статус»).
+ */
+export const DIGEST_NOTIFICATION_TYPE = ['LOAN_DUE_SOON', 'LOAN_OVERDUE'] as const
+
+export type DigestNotificationType = (typeof DIGEST_NOTIFICATION_TYPE)[number]
+
+/**
+ * §7.6: «критичне для флоу — в EMAIL».
+ *
+ * Критичне — це те, де без дії людини нічого не рухається: запит чекає на
+ * відповідь, погоджену книжку треба забрати, прострочену — повернути. Підтвердження
+ * доконаного факту (`HANDED_OVER`, `RETURNED`, `FRIEND_ACCEPTED`) сюди не входять:
+ * вони нікого ні до чого не зобов'язують, і лист про них — це той зайвий лист,
+ * після якого вимикають усі.
+ */
+export const FLOW_CRITICAL_NOTIFICATION_TYPE = [
+  'LOAN_REQUESTED',
+  'LOAN_APPROVED',
+  'LOAN_REJECTED',
+  'LOAN_CANCELLED',
+  'LOAN_DUE_SOON',
+  'LOAN_OVERDUE',
+  'FRIEND_REQUESTED',
+] as const
+
+/** Чи створюється тип щоденною задачею, а не переходом стану. */
+export function isDigestNotificationType(type: NotificationType): type is DigestNotificationType {
+  return (DIGEST_NOTIFICATION_TYPE as readonly NotificationType[]).includes(type)
+}
+
+/**
+ * §7.6, дефолти матриці «тип × канал» для клітинки, якої немає в базі.
+ *
+ * Значення обчислюється, а не матеріалізується рядками при реєстрації, і це
+ * свідомо: 10 типів × 3 канали = 30 рядків на кожного користувача, які довелося
+ * б доливати міграцією щоразу, коли з'являється новий тип події чи новий канал.
+ * Відсутність рядка означає «як за замовчуванням», а не «вимкнено».
+ *
+ * Функція живе в `shared`, бо відповідь на неї потрібна з обох боків: `apps/api`
+ * вирішує нею, які `NotificationDelivery` створювати, а `apps/web` — у якому
+ * стані малювати перемикач, якого користувач ще не чіпав. Дві копії цієї
+ * політики розійшлися б на першому ж новому типі.
+ */
+export function defaultPreferenceEnabled(
+  type: NotificationType,
+  channel: PreferenceChannel,
+  context: { telegramLinked: boolean },
+): boolean {
+  // §7.6: «Дефолти: усе в IN_APP». Вимкнути його можна, але не за замовчуванням:
+  // без жодного каналу подія була б невидимою навіть на власній сторінці.
+  if (channel === 'IN_APP') return true
+
+  // «після підключення Telegram — усе в TELEGRAM». До підключення надсилати нікуди.
+  if (channel === 'TELEGRAM') return context.telegramLinked
+
+  return (FLOW_CRITICAL_NOTIFICATION_TYPE as readonly NotificationType[]).includes(type)
+}

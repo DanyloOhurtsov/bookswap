@@ -7,7 +7,7 @@ import {
   type CatalogSearchResponse,
   type WorkDetailResponse,
 } from '@bookswap/shared'
-import { apiRequest, describeError } from './api'
+import { apiRequest, apiRequestWithRedirect, describeError } from './api'
 
 /**
  * Ті самі три стани, що й у `useSession` та `useFriends`: «ще шукаю» і «нічого не
@@ -76,21 +76,40 @@ export type WorkState =
   | { status: 'ready'; detail: WorkDetailResponse }
   | { status: 'error'; message: string }
 
-export function useWork(workId: string): { state: WorkState; reload: () => void } {
+export interface WorkResource {
+  state: WorkState
+  reload: () => void
+  /**
+   * The canonical work id when this request was answered off a merged one —
+   * `null` otherwise. §6.3 makes that a 301, `fetch` follows it, and the page
+   * uses this to move the browser's URL along with the data.
+   */
+  canonicalWorkId: string | null
+}
+
+export function useWork(workId: string): WorkResource {
   const [state, setState] = useState<WorkState>({ status: 'loading' })
   const [nonce, setNonce] = useState(0)
+  // Stored together with the id it was observed for, like the search state
+  // above: otherwise a redirect seen for one work would still look current
+  // after the caller moved on to another, and the page would bounce the URL to
+  // a book nobody asked for.
+  const [moved, setMoved] = useState<{ requestedWorkId: string; canonicalWorkId: string }>()
 
   useEffect(() => {
     const controller = new AbortController()
 
     async function load(): Promise<void> {
       try {
-        const detail = await apiRequest(`/works/${encodeURIComponent(workId)}`, {
-          schema: workDetailResponseSchema,
-          signal: controller.signal,
-        })
+        const { data: detail, redirected } = await apiRequestWithRedirect(
+          `/works/${encodeURIComponent(workId)}`,
+          { schema: workDetailResponseSchema, signal: controller.signal },
+        )
 
         setState({ status: 'ready', detail })
+        setMoved(
+          redirected ? { requestedWorkId: workId, canonicalWorkId: detail.work.id } : undefined,
+        )
       } catch (error) {
         if (controller.signal.aborted) return
 
@@ -109,5 +128,9 @@ export function useWork(workId: string): { state: WorkState; reload: () => void 
     setNonce((value) => value + 1)
   }, [])
 
-  return { state, reload }
+  return {
+    state,
+    reload,
+    canonicalWorkId: moved?.requestedWorkId === workId ? moved.canonicalWorkId : null,
+  }
 }

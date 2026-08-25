@@ -77,6 +77,40 @@ export function IsIsoDate(options?: ValidationOptions) {
 }
 
 /**
+ * Клітинка матриці §7.6 названа рівно один раз.
+ *
+ * Теж висить на масиві, а не на елементі: правило про **набір**, а не про окремий
+ * рядок. Дублікат — це 400, а не «перемагає останній»: два різні значення однієї
+ * клітинки в одному тілі означають, що клієнт зібрав форму неправильно, і
+ * зберегти будь-яке з них — зберегти не те, що людина бачила на екрані.
+ */
+export function EachPreferenceCellOnce(options?: ValidationOptions) {
+  return (object: object, propertyName: string): void => {
+    registerDecorator({
+      name: 'eachPreferenceCellOnce',
+      target: object.constructor,
+      propertyName,
+      options: { message: 'Одна клітинка матриці згадана двічі', ...options },
+      validator: {
+        validate: (value: unknown) => {
+          if (!Array.isArray(value)) return false
+
+          const cells = value.map((item) => {
+            if (typeof item !== 'object' || item === null) return ''
+
+            const { type, channel } = item as { type?: unknown; channel?: unknown }
+
+            return `${String(type)}:${String(channel)}`
+          })
+
+          return new Set(cells).size === cells.length
+        },
+      },
+    })
+  }
+}
+
+/**
  * Правило про **пару** полів усередині елемента масиву: автор задається або
  * `authorId`, або `name`, і ніколи обома.
  *

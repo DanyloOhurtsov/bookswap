@@ -16,6 +16,7 @@ import {
   type WorkDetailResponse,
 } from '@bookswap/shared'
 import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 
 /**
  * §6.3 і §8, блок «Каталог».
@@ -59,19 +60,11 @@ describe('Каталог (e2e)', () => {
     return `квітограй${String(process.pid)}${String(sequence)}`
   }
 
-  /** Валідний ISBN-13 із контрольною сумою — щоб не тримати список констант. */
-  function isbn(): string {
-    sequence += 1
-
-    const body = `978${String((process.pid % 100_000) * 100 + sequence).padStart(9, '0')}`
-    let sum = 0
-
-    for (const [index, character] of [...body].entries()) {
-      sum += Number(character) * (index % 2 === 0 ? 1 : 3)
-    }
-
-    return `${body}${String((10 - (sum % 10)) % 10)}`
-  }
+  /**
+   * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`).
+   */
+  const isbn = (): string => uniqueIsbn13('catalog')
 
   async function createWork(body: Record<string, unknown>): Promise<WorkDetailResponse> {
     const response = await request(app.getHttpServer())

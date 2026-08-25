@@ -1,4 +1,5 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common'
+import { BACKGROUND_MODE, type BackgroundMode } from '../common/background'
 import { PrismaService } from '../prisma/prisma.service'
 import { CLEANUP_INTERVAL_MS } from './auth.constants'
 import { SessionService } from './session.service'
@@ -22,9 +23,17 @@ export class SessionCleanupService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionService,
+    /** Замовчування діє лише для ручного `new`; Nest бере значення з провайдера. */
+    @Inject(BACKGROUND_MODE) private readonly background: BackgroundMode = 'enabled',
   ) {}
 
   onModuleInit(): void {
+    // Прибирання нікому не заважає за змістом (воно чіпає лише прострочене), але
+    // це та сама фонова робота по спільній базі: в e2e її розклад вимкнений
+    // разом з рештою, щоб інваріант «поки йде файл, фону немає» був повним.
+    // `run()` лишається публічним — `session-cleanup.e2e-spec.ts` кличе його сам.
+    if (this.background === 'disabled') return
+
     this.timer = setInterval(() => {
       void this.run()
     }, CLEANUP_INTERVAL_MS)

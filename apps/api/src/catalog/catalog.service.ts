@@ -21,6 +21,7 @@ import {
 import { ApiException } from '../common/api.exception'
 import { isUniqueViolation } from '../common/prisma-errors'
 import { PrismaService } from '../prisma/prisma.service'
+import { CanonicalWorkService, workMergedConflict } from './canonical/canonical-work.service'
 import { byEditionOrder, toEdition, toTranslation, toWork, toWorkAuthors } from './catalog.mapper'
 import { pinSimilarityThreshold, rankAuthors, rankWorks } from './catalog.search'
 import { escapeLikePattern } from './search-text'
@@ -48,6 +49,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly normalizer: TextNormalizer,
+    private readonly canonical: CanonicalWorkService,
   ) {}
 
   /**
@@ -226,7 +228,7 @@ export class CatalogService {
     workId: string,
     request: CreateTranslationRequest,
   ): Promise<TranslationResponse> {
-    await this.assertWorkExists(workId)
+    await this.canonical.assertCanonical(workId)
 
     const translation = await this.prisma.translation.create({
       data: {
@@ -251,10 +253,21 @@ export class CatalogService {
   ): Promise<EditionResponse> {
     const work = await this.prisma.work.findUnique({
       where: { id: workId },
-      select: { id: true, origLang: true },
+      select: { id: true, origLang: true, mergedIntoId: true },
     })
 
     if (work === null) throw notFound('Твір не знайдено')
+
+    // Stage 7h: `mergedIntoId` is read here rather than through
+    // `CanonicalWorkService.assertCanonical` only to avoid a second lookup —
+    // `origLang` is needed anyway. The rule and its reasoning live there.
+    if (work.mergedIntoId !== null) {
+      throw workMergedConflict({
+        workId: work.mergedIntoId,
+        requestedWorkId: workId,
+        moved: true,
+      })
+    }
 
     const translationId = request.translationId ?? null
 
@@ -326,8 +339,14 @@ export class CatalogService {
   ): Promise<CatalogSearchResult[]> {
     if (ids.length === 0) return []
 
+    // `mergedIntoId: null` — DoD 7h: a merged work is never a search hit of its
+    // own. `rankWorks` already filters it out; the ISBN branch reaches this
+    // method through `Edition.workId`, which cannot belong to a merged work
+    // either (writes are refused, and the merge moves editions along). Repeating
+    // the condition here keeps the guarantee local to the query that returns
+    // the rows, exactly as `SearchCandidatesService.hydrate` does.
     const works = await this.prisma.work.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, mergedIntoId: null },
       include: { ...WITH_AUTHORS, ...WITH_EDITIONS },
     })
 
@@ -354,7 +373,16 @@ export class CatalogService {
 
     const authors = await this.prisma.author.findMany({
       where: { id: { in: ids } },
-      select: { id: true, name: true, nameLatin: true, works: { select: { workId: true } } },
+      select: {
+        id: true,
+        name: true,
+        nameLatin: true,
+        // DoD 7h: merged works are not separate entries anywhere in the output,
+        // and a count is an entry too. The merge does NOT move `WorkAuthor`
+        // rows, so without this filter an author linked to both the duplicate
+        // and the canonical work is credited with two books instead of one.
+        works: { where: { work: { mergedIntoId: null } }, select: { workId: true } },
+      },
     })
 
     const byId = new Map(authors.map((author) => [author.id, author]))
@@ -375,12 +403,6 @@ export class CatalogService {
         },
       ]
     })
-  }
-
-  private async assertWorkExists(workId: string): Promise<void> {
-    const work = await this.prisma.work.findUnique({ where: { id: workId }, select: { id: true } })
-
-    if (work === null) throw notFound('Твір не знайдено')
   }
 
   private async assertAuthorsExist(

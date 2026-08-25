@@ -4,6 +4,15 @@
   "testRegex": ".*\\.e2e-spec\\.ts$",
   "globalSetup": "<rootDir>/db/global-setup.ts",
   "setupFiles": ["<rootDir>/db/use-test-database.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/e2e-setup.ts"],
+  // 15 секунд, а не типові 5. Це НЕ спосіб сховати зависання: кожен тест, який
+  // справді чогось чекає (локи, гейти, оренда доставки), передає власний явний
+  // таймаут третім аргументом `it(...)`, і це значення на них не діє взагалі.
+  // Воно стосується решти — звичайних сценаріїв, де найдорожче місце це два
+  // argon2-геші на реєстрацію. На завантаженій машині (а `gate.sh` перед e2e
+  // ганяє lint, typecheck, build і seed) такий тест упирався в 5 секунд стінного
+  // часу й падав з `Exceeded timeout`, нічого не перевіривши: 1 прогін із 20.
+  "testTimeout": 15000,
   "maxWorkers": 1,
   "workerIdleMemoryLimit": "512MB",
   "transform": {

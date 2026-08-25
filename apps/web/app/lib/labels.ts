@@ -1,5 +1,6 @@
 import type {
   AuthorRole,
+  Channel,
   Condition,
   CopyStatus,
   EditionFormat,
@@ -76,6 +77,18 @@ export const NOTIFICATION_TYPE_LABELS: Readonly<Record<NotificationType, string>
   LOAN_OVERDUE: 'Термін минув',
   FRIEND_REQUESTED: 'Новий запит у друзі',
   FRIEND_ACCEPTED: 'Запит у друзі прийнято',
+}
+
+/**
+ * §4.8 — канали доставки. `IN_APP` — повноправна колонка матриці §7.6, з
+ * власним перемикачем (`channelStates()` позначає її `editable: true`), а не
+ * лише підпис у поясненнях: людина може вимкнути список на сайті окремо від
+ * email і Telegram.
+ */
+export const CHANNEL_LABELS: Readonly<Record<Channel, string>> = {
+  IN_APP: 'У застосунку',
+  EMAIL: 'Пошта',
+  TELEGRAM: 'Telegram',
 }
 
 export const EDITION_FORMAT_LABELS: Readonly<Record<EditionFormat, string>> = {

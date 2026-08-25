@@ -153,6 +153,10 @@ function GroupCard({
         {group.work.title}
         {group.counts.total > 1 && ` ×${String(group.counts.total)}`}
       </Link>
+      {/* §6.5: позначка з вішлиста — лише прапорець, без дій тут. Прибрати чи
+          додати можна на сторінці твору (`WishlistButton`), де є й `authors`
+          для оптимістичного додавання. */}
+      {group.inWishlist && <span className="badge">У вішлисті</span>}
       <AuthorLine authors={group.authors} />
       <EditionLine edition={group.edition} />
 
