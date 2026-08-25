@@ -15,7 +15,13 @@ import {
   type WorkDetailResponse,
 } from '@bookswap/shared'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import {
+  VALID_PASSWORD,
+  createTestApp,
+  sessionCookie,
+  uniqueEmail,
+  uniqueIsbn13,
+} from './auth.helpers'
 
 /**
  * Етап 7c: бекенд-пошук кандидатів перед створенням `Work`/`Edition` (§6.3,
@@ -59,19 +65,11 @@ describe('GET /catalog/search/candidates (e2e)', () => {
     return `кандидат${String(process.pid)}${String(sequence)}`
   }
 
-  /** Валідний ISBN-13 із контрольною сумою — щоб не тримати список констант. */
-  function isbn(): string {
-    sequence += 1
-
-    const body = `978${String((process.pid % 100_000) * 100 + sequence).padStart(9, '0')}`
-    let sum = 0
-
-    for (const [index, character] of [...body].entries()) {
-      sum += Number(character) * (index % 2 === 0 ? 1 : 3)
-    }
-
-    return `${body}${String((10 - (sum % 10)) % 10)}`
-  }
+  /**
+   * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
+   * (`uniqueIsbn13`, §auth.helpers.ts).
+   */
+  const isbn = (): string => uniqueIsbn13('catalog-search-candidates')
 
   async function createWork(body: Record<string, unknown>): Promise<WorkDetailResponse> {
     const response = await request(app.getHttpServer())

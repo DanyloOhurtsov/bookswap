@@ -4,7 +4,13 @@ import request from 'supertest'
 import type { App } from 'supertest/types'
 import { API_ERROR_CODES, API_PREFIX, apiErrorSchema } from '@bookswap/shared'
 import { BOOK_LOOKUP_PROVIDER } from '../src/catalog/lookup/book-lookup-provider'
-import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import {
+  VALID_PASSWORD,
+  createTestApp,
+  sessionCookie,
+  uniqueEmail,
+  uniqueIsbn13,
+} from './auth.helpers'
 import { FakeLookupProvider } from './lookup/fake-lookup-provider'
 
 /**
@@ -57,21 +63,12 @@ describe('Rate limiting на GET /catalog/lookup (e2e)', () => {
 
   const url = (path: string): string => `${API_PREFIX}${path}`
 
-  let sequence = 0
-
-  /** Валідний ISBN-13 із контрольною сумою — свій на кожен виклик. */
-  function isbn(): string {
-    sequence += 1
-
-    const body = `978${String((process.pid % 100_000) * 100 + sequence).padStart(9, '0')}`
-    let sum = 0
-
-    for (const [index, character] of [...body].entries()) {
-      sum += Number(character) * (index % 2 === 0 ? 1 : 3)
-    }
-
-    return `${body}${String((10 - (sum % 10)) % 10)}`
-  }
+  /**
+   * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
+   * (`uniqueIsbn13`, §auth.helpers.ts). Саме тут і в
+   * `catalog-lookup.e2e-spec.ts` була колізія до фіксу.
+   */
+  const isbn = (): string => uniqueIsbn13('catalog-lookup-rate-limit')
 
   const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 

@@ -17,7 +17,13 @@ import {
 import { MergeService } from '../src/catalog/merge/merge.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { WORK_MERGE_ERROR_CODES } from '../src/catalog/merge/merge-errors'
-import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import {
+  VALID_PASSWORD,
+  createTestApp,
+  sessionCookie,
+  uniqueEmail,
+  uniqueIsbn13,
+} from './auth.helpers'
 import type { INestApplication } from '@nestjs/common'
 import type { App } from 'supertest/types'
 
@@ -79,19 +85,13 @@ describe('Канонічне розв’язання Work (e2e)', () => {
     return `канонікум${String(process.pid)}${String(sequence)}`
   }
 
-  /** Валідний ISBN-13 із контрольною сумою — щоб не тримати список констант. */
-  function isbn(): string {
-    sequence += 1
-
-    const body = `979${String((process.pid % 100_000) * 100 + sequence).padStart(9, '0')}`
-    let sum = 0
-
-    for (const [index, character] of [...body].entries()) {
-      sum += Number(character) * (index % 2 === 0 ? 1 : 3)
-    }
-
-    return `${body}${String((10 - (sum % 10)) % 10)}`
-  }
+  /**
+   * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
+   * (`uniqueIsbn13`, §auth.helpers.ts). Префікс 979 — інший Bookland-діапазон,
+   * ніж у сусідніх lookup-файлів (978), суто щоб файл лишався візуально
+   * впізнаваним у логах; на унікальність це не впливає, її дає namespace.
+   */
+  const isbn = (): string => uniqueIsbn13('catalog-canonical', '979')
 
   async function createWork(title: string, authorName: string): Promise<WorkDetailResponse> {
     const response = await request(app.getHttpServer())
