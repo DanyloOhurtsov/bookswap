@@ -21,7 +21,7 @@ import WorkPage from './page'
  */
 
 jest.mock('../../lib/api', () => {
-  const actual = jest.requireActual<typeof import('../../lib/api')>('../../lib/api')
+  const actual = jest.requireActual<typeof import('../../../lib/api')>('../../lib/api')
 
   return { ...actual, apiRequest: jest.fn(), apiRequestWithRedirect: jest.fn() }
 })

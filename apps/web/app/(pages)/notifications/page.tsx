@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Notification } from '@bookswap/shared'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { NOTIFICATION_TYPE_LABELS, formatDate } from '../lib/labels'
-import { useNotifications } from '../lib/use-notifications'
-import { useSession } from '../lib/use-session'
+import { FormStatus } from '../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { NOTIFICATION_TYPE_LABELS, formatDate } from '../../lib/labels'
+import { useNotifications } from '../../lib/use-notifications'
+import { useSession } from '../../lib/use-session'
 
 /**
  * §7 і §8: центр in-app сповіщень.

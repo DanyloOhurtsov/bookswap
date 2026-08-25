@@ -13,10 +13,10 @@ import {
   type PreferenceChannel,
   type TelegramLinkResponse,
 } from '@bookswap/shared'
-import { ConfirmDialog } from '../../components/confirm-dialog'
-import { FormStatus } from '../../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '../../lib/labels'
+import { ConfirmDialog } from '../../../components/confirm-dialog'
+import { FormStatus } from '../../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
+import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '../../../lib/labels'
 import {
   changedCells,
   channelStates,
@@ -27,10 +27,10 @@ import {
   toggleCell,
   type ChannelState,
   type PreferenceMatrix,
-} from '../../lib/notification-preferences'
-import { displayDecision } from '../../lib/resource-state'
-import { useNotificationPreferences } from '../../lib/use-notification-preferences'
-import { useSession } from '../../lib/use-session'
+} from '../../../lib/notification-preferences'
+import { displayDecision } from '../../../lib/resource-state'
+import { useNotificationPreferences } from '../../../lib/use-notification-preferences'
+import { useSession } from '../../../lib/use-session'
 
 /**
  * §7.6 і §7.4: матриця «тип події × канал», стан каналів і прив'язка Telegram.

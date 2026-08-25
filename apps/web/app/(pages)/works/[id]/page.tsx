@@ -13,18 +13,18 @@ import {
   type Translation,
   type Visibility,
 } from '@bookswap/shared'
-import { AuthorLine, Chip, EditionLine } from '../../components/book'
-import { SelectField, TextField } from '../../components/form-field'
-import { FormStatus } from '../../components/form-status'
-import { HistoryEntryLine } from '../../components/history'
-import { WishlistButton } from '../../components/wishlist-button'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../lib/labels'
-import { useWork } from '../../lib/use-catalog'
-import { useWorkHistory } from '../../lib/use-history'
-import { useSession } from '../../lib/use-session'
-import { useWishlist } from '../../lib/use-wishlist'
-import { validate, type FieldErrors } from '../../lib/validation'
+import { AuthorLine, Chip, EditionLine } from '../../../components/book'
+import { SelectField, TextField } from '../../../components/form-field'
+import { FormStatus } from '../../../components/form-status'
+import { HistoryEntryLine } from '../../../components/history'
+import { WishlistButton } from '../../../components/wishlist-button'
+import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
+import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../../lib/labels'
+import { useWork } from '../../../lib/use-catalog'
+import { useWorkHistory } from '../../../lib/use-history'
+import { useSession } from '../../../lib/use-session'
+import { useWishlist } from '../../../lib/use-wishlist'
+import { validate, type FieldErrors } from '../../../lib/validation'
 
 /**
  * Сторінка твору: метадані, переклади з ознаками §10.3 і видання.

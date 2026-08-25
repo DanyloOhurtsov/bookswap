@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
-import { AuthorLine } from '../components/book'
-import { FormStatus } from '../components/form-status'
-import { useSession } from '../lib/use-session'
-import { useWishlist } from '../lib/use-wishlist'
+import { AuthorLine } from '../../components/book'
+import { FormStatus } from '../../components/form-status'
+import { useSession } from '../../lib/use-session'
+import { useWishlist } from '../../lib/use-wishlist'
 
 /**
  * §6.5 і §8, підетап 7f: сторінка вішлиста — список творів і кнопка «Прибрати»

@@ -18,15 +18,15 @@ import {
   type OwnerCopyStatus,
   type Visibility,
 } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../components/book'
-import { ConfirmDialog } from '../components/confirm-dialog'
-import { SelectField, TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { CONDITION_LABELS, COPY_STATUS_LABELS, VISIBILITY_LABELS, formatDate } from '../lib/labels'
-import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../lib/use-library'
-import { useSession } from '../lib/use-session'
-import { validate, type FieldErrors } from '../lib/validation'
+import { AuthorLine, EditionLine } from '../../components/book'
+import { ConfirmDialog } from '../../components/confirm-dialog'
+import { SelectField, TextField } from '../../components/form-field'
+import { FormStatus } from '../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { CONDITION_LABELS, COPY_STATUS_LABELS, VISIBILITY_LABELS, formatDate } from '../../lib/labels'
+import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../../lib/use-library'
+import { useSession } from '../../lib/use-session'
+import { validate, type FieldErrors } from '../../lib/validation'
 
 /**
  * §6.4: особиста бібліотека.

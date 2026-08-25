@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState, type FormEvent } from 'react'
 import { PASSWORD_LIMITS, confirmPasswordResetRequestSchema } from '@bookswap/shared'
-import { TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { validate, type FieldErrors } from '../lib/validation'
+import { TextField } from '../../components/form-field'
+import { FormStatus } from '../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { validate, type FieldErrors } from '../../lib/validation'
 
 function ResetPasswordForm() {
   const router = useRouter()

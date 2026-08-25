@@ -8,14 +8,14 @@ import {
   type VisibleCopy,
   type VisibleLibraryGroup,
 } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../../../components/book'
-import { TextField } from '../../../components/form-field'
-import { FormStatus } from '../../../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
-import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '../../../lib/labels'
-import { useFriendLibrary } from '../../../lib/use-library'
-import { useSession } from '../../../lib/use-session'
-import { validate, type FieldErrors } from '../../../lib/validation'
+import { AuthorLine, EditionLine } from '../../../../components/book'
+import { TextField } from '../../../../components/form-field'
+import { FormStatus } from '../../../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../../../lib/api'
+import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '../../../../lib/labels'
+import { useFriendLibrary } from '../../../../lib/use-library'
+import { useSession } from '../../../../lib/use-session'
+import { validate, type FieldErrors } from '../../../../lib/validation'
 
 /**
  * §6.5: бібліотека іншої людини.

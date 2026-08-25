@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { sessionResponseSchema } from '@bookswap/shared'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
+import { FormStatus } from '../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 
 type State =
   | { kind: 'ready' }

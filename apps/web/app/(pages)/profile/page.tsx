@@ -12,11 +12,11 @@ import {
   type Me,
   type Visibility,
 } from '@bookswap/shared'
-import { SelectField, TextAreaField, TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { useSession } from '../lib/use-session'
-import { validate, type FieldErrors } from '../lib/validation'
+import { SelectField, TextAreaField, TextField } from '../../components/form-field'
+import { FormStatus } from '../../components/form-status'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { useSession } from '../../lib/use-session'
+import { validate, type FieldErrors } from '../../lib/validation'
 
 const VISIBILITY_LABELS: Record<Visibility, string> = {
   PUBLIC: 'Публічна — бачить будь-хто',
