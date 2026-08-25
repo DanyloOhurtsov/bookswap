@@ -10,13 +10,8 @@ import {
   type BookLookupResult,
 } from '@bookswap/shared'
 import { BOOK_LOOKUP_PROVIDER } from '../src/catalog/lookup/book-lookup-provider'
-import {
-  VALID_PASSWORD,
-  createTestApp,
-  sessionCookie,
-  uniqueEmail,
-  uniqueIsbn13,
-} from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 import { FakeLookupProvider } from './lookup/fake-lookup-provider'
 
 /**
@@ -66,7 +61,7 @@ describe('GET /catalog/lookup (e2e)', () => {
 
   /**
    * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
-   * (`uniqueIsbn13`, §auth.helpers.ts).
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`).
    */
   const isbn = (): string => uniqueIsbn13('catalog-lookup')
 

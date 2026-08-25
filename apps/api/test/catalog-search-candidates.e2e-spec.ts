@@ -15,13 +15,8 @@ import {
   type WorkDetailResponse,
 } from '@bookswap/shared'
 import { PrismaService } from '../src/prisma/prisma.service'
-import {
-  VALID_PASSWORD,
-  createTestApp,
-  sessionCookie,
-  uniqueEmail,
-  uniqueIsbn13,
-} from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 
 /**
  * Етап 7c: бекенд-пошук кандидатів перед створенням `Work`/`Edition` (§6.3,
@@ -67,7 +62,7 @@ describe('GET /catalog/search/candidates (e2e)', () => {
 
   /**
    * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
-   * (`uniqueIsbn13`, §auth.helpers.ts).
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`).
    */
   const isbn = (): string => uniqueIsbn13('catalog-search-candidates')
 

@@ -4,13 +4,8 @@ import request from 'supertest'
 import type { App } from 'supertest/types'
 import { API_ERROR_CODES, API_PREFIX, apiErrorSchema } from '@bookswap/shared'
 import { BOOK_LOOKUP_PROVIDER } from '../src/catalog/lookup/book-lookup-provider'
-import {
-  VALID_PASSWORD,
-  createTestApp,
-  sessionCookie,
-  uniqueEmail,
-  uniqueIsbn13,
-} from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 import { FakeLookupProvider } from './lookup/fake-lookup-provider'
 
 /**
@@ -65,7 +60,7 @@ describe('Rate limiting на GET /catalog/lookup (e2e)', () => {
 
   /**
    * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
-   * (`uniqueIsbn13`, §auth.helpers.ts). Саме тут і в
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`). Саме тут і в
    * `catalog-lookup.e2e-spec.ts` була колізія до фіксу.
    */
   const isbn = (): string => uniqueIsbn13('catalog-lookup-rate-limit')

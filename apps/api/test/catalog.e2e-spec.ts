@@ -15,13 +15,8 @@ import {
   type CatalogSearchResponse,
   type WorkDetailResponse,
 } from '@bookswap/shared'
-import {
-  VALID_PASSWORD,
-  createTestApp,
-  sessionCookie,
-  uniqueEmail,
-  uniqueIsbn13,
-} from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 
 /**
  * §6.3 і §8, блок «Каталог».
@@ -67,7 +62,7 @@ describe('Каталог (e2e)', () => {
 
   /**
    * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
-   * (`uniqueIsbn13`, §auth.helpers.ts).
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`).
    */
   const isbn = (): string => uniqueIsbn13('catalog')
 

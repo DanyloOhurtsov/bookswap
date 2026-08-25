@@ -17,13 +17,8 @@ import {
 import { MergeService } from '../src/catalog/merge/merge.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { WORK_MERGE_ERROR_CODES } from '../src/catalog/merge/merge-errors'
-import {
-  VALID_PASSWORD,
-  createTestApp,
-  sessionCookie,
-  uniqueEmail,
-  uniqueIsbn13,
-} from './auth.helpers'
+import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 import type { INestApplication } from '@nestjs/common'
 import type { App } from 'supertest/types'
 
@@ -87,7 +82,7 @@ describe('Канонічне розв’язання Work (e2e)', () => {
 
   /**
    * Валідний ISBN-13 для перевіреного namespace цього e2e-файлу
-   * (`uniqueIsbn13`, §auth.helpers.ts). Префікс 979 — інший Bookland-діапазон,
+   * (`uniqueIsbn13`, `./helpers/unique-isbn.ts`). Префікс 979 — інший Bookland-діапазон,
    * ніж у сусідніх lookup-файлів (978), суто щоб файл лишався візуально
    * впізнаваним у логах; на унікальність це не впливає, її дає namespace.
    */

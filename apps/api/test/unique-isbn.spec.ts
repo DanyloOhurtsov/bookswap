@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { isValidIsbn13, isbn13Schema } from '@bookswap/shared'
-import { uniqueIsbn13 } from './auth.helpers'
+import { uniqueIsbn13 } from './helpers/unique-isbn'
 
 /**
  * Аудит cleanup Stage 7: ізольований прогін лише `catalog-lookup.e2e-spec.ts`
@@ -13,8 +15,9 @@ import { uniqueIsbn13 } from './auth.helpers'
  * замість виклику власного fake-провайдера.
  *
  * Нижче: (1) старий алгоритм гарантовано відтворює колізію — локальна копія
- * старої формули, а не вигадана; (2) новий `uniqueIsbn13` (§auth.helpers.ts)
- * тієї самої колізії не дає для тих самих двох «файлів».
+ * старої формули, а не вигадана; (2) новий `uniqueIsbn13`
+ * (`./helpers/unique-isbn.ts`) тієї самої колізії не дає для тих самих двох
+ * «файлів».
  */
 describe('колізія старого генератора ISBN (regression proof)', () => {
   /** Точна копія старої формули з кожного catalog-lookup*.e2e-spec.ts. */
@@ -115,5 +118,32 @@ describe('uniqueIsbn13', () => {
     for (let index = 0; index < 999; index += 1) uniqueIsbn13(namespace)
 
     expect(() => uniqueIsbn13(namespace)).toThrow(/вичерпано лічильник/)
+  })
+})
+
+/**
+ * CI-регресія: `./helpers/unique-isbn.ts` раніше жив у `auth.helpers.ts`,
+ * який імпортує `AppModule` для `createTestApp()`. Цей spec запускається
+ * `apps/api/jest.config.js` (unit-конфіг, без `DATABASE_URL`/
+ * `DIRECT_DATABASE_URL`), і `AppModule` → `ConfigModule.forRoot({ validate:
+ * validateEnv })` валить Jest worker ще до першого тесту.
+ *
+ * Статична перевірка тексту джерела, а не resolve графа модулів: доводить
+ * рівно те, що потрібно (жоден import-специфікатор у файлі не веде на
+ * Nest/Prisma/AppModule/auth-helpers), без побудови повноцінного
+ * dependency-checker.
+ */
+describe('pure module boundary (regression proof)', () => {
+  it('helpers/unique-isbn.ts не імпортує AppModule, Nest testing, Prisma чи auth.helpers', () => {
+    const source = readFileSync(join(__dirname, 'helpers/unique-isbn.ts'), 'utf8')
+    const importSpecifiers = [...source.matchAll(/^import\s+.*?from\s+['"]([^'"]+)['"]/gm)].map(
+      (match) => match[1],
+    )
+
+    const forbidden = /app\.module|@nestjs|prisma|auth\.helpers|config\/env\.validation/i
+
+    for (const specifier of importSpecifiers) {
+      expect(specifier).not.toMatch(forbidden)
+    }
   })
 })
