@@ -13,8 +13,8 @@ import {
   type PreferenceChannel,
   type TelegramLinkResponse,
 } from '@bookswap/shared'
-import { ConfirmDialog } from '../../../components/confirm-dialog'
-import { FormStatus } from '../../../components/form-status'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { FormStatus } from '@/components/Form/FormStatus'
 import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
 import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '../../../lib/labels'
 import {

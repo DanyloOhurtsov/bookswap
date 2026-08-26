@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { MyHistoryEntry } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../components/book'
-import { FormStatus } from '../components/form-status'
-import { HistoryEntryLine } from '../components/history'
-import { useMyHistory } from '../lib/use-history'
-import { useSession } from '../lib/use-session'
+import { AuthorLine, EditionLine } from '@/components/BookParts'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { useSession } from '@/app/lib/use-session'
+import { useMyHistory } from '@/app/lib/use-history'
+import { HistoryEntryLine } from '@/components/HistoryEntryLine'
 
 /**
  * §6.6, «Моя історія»: що я брав і що в мене брали.

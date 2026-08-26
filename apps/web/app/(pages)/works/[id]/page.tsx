@@ -13,11 +13,11 @@ import {
   type Translation,
   type Visibility,
 } from '@bookswap/shared'
-import { AuthorLine, Chip, EditionLine } from '../../../components/book'
-import { SelectField, TextField } from '../../../components/form-field'
-import { FormStatus } from '../../../components/form-status'
-import { HistoryEntryLine } from '../../../components/history'
-import { WishlistButton } from '../../../components/wishlist-button'
+import { AuthorLine, Chip, EditionLine } from '@/components/BookParts'
+import { HistoryEntryLine } from '@/components/HistoryEntryLine'
+import { SelectField, TextField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { WishlistButton } from '@/components/WishList/WishListButton'
 import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../../lib/labels'
 import { useWork } from '../../../lib/use-catalog'

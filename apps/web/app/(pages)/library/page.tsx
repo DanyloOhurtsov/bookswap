@@ -18,10 +18,10 @@ import {
   type OwnerCopyStatus,
   type Visibility,
 } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../../components/book'
-import { ConfirmDialog } from '../../components/confirm-dialog'
-import { SelectField, TextField } from '../../components/form-field'
-import { FormStatus } from '../../components/form-status'
+import { AuthorLine, EditionLine } from '@/components/BookParts'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { SelectField, TextField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 import {
   CONDITION_LABELS,

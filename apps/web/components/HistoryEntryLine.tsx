@@ -1,7 +1,7 @@
 'use client'
 
 import type { HistoryEntry } from '@bookswap/shared'
-import { LOAN_STATUS_LABELS, formatDate } from '../lib/labels'
+import { formatDate, LOAN_STATUS_LABELS } from '@/app/lib/labels'
 
 /**
  * Один запис історії (§6.6).

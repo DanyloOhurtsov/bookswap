@@ -12,8 +12,8 @@ import {
   type Me,
   type Visibility,
 } from '@bookswap/shared'
-import { SelectField, TextAreaField, TextField } from '../../components/form-field'
-import { FormStatus } from '../../components/form-status'
+import { SelectField, TextAreaField, TextField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'

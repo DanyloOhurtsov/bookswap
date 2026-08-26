@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import { acceptedResponseSchema, requestPasswordResetRequestSchema } from '@bookswap/shared'
-import { TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { validate, type FieldErrors } from '../lib/validation'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { apiRequest, ApiRequestError, describeError } from '@/app/lib/api'
+import { FieldErrors, validate } from '@/app/lib/validation'
+import { TextField } from '@/components/Form/FormFields'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
