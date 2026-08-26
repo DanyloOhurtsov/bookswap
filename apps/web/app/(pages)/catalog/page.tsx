@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { catalogSearchRequestSchema, type CatalogSearchResult } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../components/book'
-import { TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { useCatalogSearch } from '../lib/use-catalog'
-import { useSession } from '../lib/use-session'
-import { validate, type FieldErrors } from '../lib/validation'
+import { AuthorLine, EditionLine } from '@/components/BookParts'
+import { useSession } from '@/app/lib/use-session'
+import { FieldErrors, validate } from '@/app/lib/validation'
+import { useCatalogSearch } from '@/app/lib/use-catalog'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { TextField } from '@/components/Form/FormFields'
 
 /**
  * §6.3, кроки 1–2: людина вводить назву або ISBN і бачить «Можливо, це одна з

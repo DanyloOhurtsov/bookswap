@@ -1,4 +1,4 @@
-import { HealthStatus } from './health-status'
+import { HealthStatus } from '@/components/DEV/HealthStatus'
 
 /**
  * Статична сторінка: жодного звернення до API під час складання чи пререндеру.

@@ -20,13 +20,13 @@ import WorkPage from './page'
  * відповідь клієнта API → хук → заміна адреси.
  */
 
-jest.mock('../../lib/api', () => {
-  const actual = jest.requireActual<typeof import('../../../lib/api')>('../../lib/api')
+jest.mock('@/app/lib/api', () => {
+  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn(), apiRequestWithRedirect: jest.fn() }
 })
 
-jest.mock('../../lib/use-session', () => ({
+jest.mock('@/app/lib/use-session', () => ({
   useSession: () => ({
     state: { status: 'authenticated', user: { id: 'me', name: 'Тест', email: 't@example.com' } },
     reload: jest.fn(),
@@ -43,7 +43,7 @@ jest.mock('next/navigation', () => ({
 }))
 
 const { apiRequest: mockApiRequest, apiRequestWithRedirect: mockApiRequestWithRedirect } =
-  jest.requireMock<{ apiRequest: jest.Mock; apiRequestWithRedirect: jest.Mock }>('../../lib/api')
+  jest.requireMock<{ apiRequest: jest.Mock; apiRequestWithRedirect: jest.Mock }>('@/app/lib/api')
 
 function work(id: string, title: string): Work {
   return {

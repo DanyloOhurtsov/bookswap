@@ -13,13 +13,13 @@ import WishlistPage from './page'
  * справжній рендер.
  */
 
-jest.mock('../lib/api', () => {
-  const actual = jest.requireActual<typeof import('../../lib/api')>('../lib/api')
+jest.mock('@/app/lib/api', () => {
+  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn() }
 })
 
-jest.mock('../lib/use-session', () => ({
+jest.mock('@/app/lib/use-session', () => ({
   useSession: () => ({
     state: { status: 'authenticated', user: { id: 'me', name: 'Тест', email: 't@example.com' } },
     reload: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
 }))
 
-const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('../lib/api')
+const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('@/app/lib/api')
 
 interface Deferred<T> {
   promise: Promise<T>

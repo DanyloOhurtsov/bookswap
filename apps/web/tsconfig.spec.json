@@ -16,5 +16,5 @@
     "rootDir": ".",
     "types": ["node", "jest", "@testing-library/jest-dom"]
   },
-  "include": ["app/**/*.ts", "app/**/*.tsx"]
+  "include": ["app/**/*.ts", "app/**/*.tsx", "components/**/*.ts", "components/**/*.tsx"]
 }

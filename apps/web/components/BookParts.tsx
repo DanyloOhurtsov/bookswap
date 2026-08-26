@@ -2,16 +2,9 @@
 
 import Link from 'next/link'
 import type { Edition, Work, WorkAuthor } from '@bookswap/shared'
-import { AUTHOR_ROLE_LABELS, EDITION_FORMAT_LABELS } from '../lib/labels'
+import { AUTHOR_ROLE_LABELS, EDITION_FORMAT_LABELS } from '@/app/lib/labels'
 
-/**
- * Спільні шматки показу каталогу: підпис авторів, рядок видання, чипи ознак.
- *
- * Винесені сюди, бо однакові на чотирьох сторінках — пошуку, творі, бібліотеці
- * своїй і чужій. Розійшовшись, вони б показували ту саму книжку по-різному.
- */
-
-export function AuthorLine({ authors }: { authors: WorkAuthor[] }) {
+function AuthorLine({ authors }: { authors: WorkAuthor[] }) {
   if (authors.length === 0) return <span className="book__meta">Автора не вказано</span>
 
   return (
@@ -27,7 +20,7 @@ export function AuthorLine({ authors }: { authors: WorkAuthor[] }) {
   )
 }
 
-export function WorkTitle({ work, authors }: { work: Work; authors: WorkAuthor[] }) {
+function WorkTitle({ work, authors }: { work: Work; authors: WorkAuthor[] }) {
   return (
     <>
       <Link className="book__title" href={`/works/${work.id}`}>
@@ -46,7 +39,7 @@ export function WorkTitle({ work, authors }: { work: Work; authors: WorkAuthor[]
  * оригіналу це мова твору й порожній перекладач (§4.4), і фронт цю умову не
  * повторює.
  */
-export function EditionLine({ edition }: { edition: Edition }) {
+function EditionLine({ edition }: { edition: Edition }) {
   const parts = [
     edition.publisher,
     edition.year === null ? null : String(edition.year),
@@ -69,6 +62,8 @@ export function EditionLine({ edition }: { edition: Edition }) {
   )
 }
 
-export function Chip({ children }: { children: string }) {
+function Chip({ children }: { children: string }) {
   return <span className="chip">{children}</span>
 }
+
+export { AuthorLine, WorkTitle, EditionLine, Chip }

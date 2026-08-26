@@ -4,30 +4,25 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import type { WishlistItem, Work, WorkAuthor } from '@bookswap/shared'
-import { useWishlist } from '../lib/use-wishlist'
-import { WishlistButton } from './wishlist-button'
+import * as api from '@/app/lib/api'
+import { useWishlist } from '@/app/lib/use-wishlist'
+import { WishlistButton } from '@/components/WishList/WishListButton'
 
 /**
  * Етап 7f, DoD: «оптимістичне оновлення відкочується при помилці».
  *
- * `apiRequest` мокається цілим модулем — `ApiRequestError`/`describeError`
- * лишаються справжніми, бо саме за ними хук вирішує, яке повідомлення
- * показати. `useWishlist` тут справжній: перевіряється не сама кнопка окремо,
- * а зв'язка «клік → одразу видно зміну → відповідь сервера» разом із хуком,
- * який цю зміну й відкочує.
+ * `apiRequest` підміняється через `jest.spyOn`, тому `ApiRequestError` і
+ * `describeError` лишаються справжніми: саме за ними хук вирішує, яке
+ * повідомлення показати. `useWishlist` тут справжній: перевіряється не сама
+ * кнопка окремо, а зв'язка «клік → одразу видно зміну → відповідь сервера»
+ * разом із хуком, який цю зміну й відкочує.
  *
  * Мітки: `member` уже відображає ОПТИМІСТИЧНУ ціль mutation, що летить —
  * `busy && member` це щойно доданий (ще не підтверджений) рядок, тобто
  * «Додаю…»; `busy && !member` — щойно прибраний, тобто «Прибираю…».
  * `WishlistButton` саме так і мапить `busy`/`member` на напис.
  */
-jest.mock('../lib/api', () => {
-  const actual = jest.requireActual<typeof import('../lib/api')>('../lib/api')
-
-  return { ...actual, apiRequest: jest.fn() }
-})
-
-const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('../lib/api')
+const mockApiRequest = jest.spyOn(api, 'apiRequest')
 
 interface Deferred<T> {
   promise: Promise<T>

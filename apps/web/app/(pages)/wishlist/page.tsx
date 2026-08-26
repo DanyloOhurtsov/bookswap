@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
-import { AuthorLine } from '../../components/book'
-import { FormStatus } from '../../components/form-status'
+import { AuthorLine } from '@/components/BookParts'
+import { FormStatus } from '@/components/Form/FormStatus'
 import { useSession } from '../../lib/use-session'
 import { useWishlist } from '../../lib/use-wishlist'
 

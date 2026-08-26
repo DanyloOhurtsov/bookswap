@@ -1,8 +1,8 @@
 'use client'
 
 import type { Work, WorkAuthor } from '@bookswap/shared'
-import type { WishlistController } from '../lib/use-wishlist'
-import { FormStatus } from './form-status'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { WishlistController } from '@/app/lib/use-wishlist'
 
 /**
  * Кнопка додати/прибрати твір із вішлиста (Етап 7f, DoD).
@@ -13,7 +13,7 @@ import { FormStatus } from './form-status'
  *
  * Поки перший `GET /me/wishlist` не приїхав, `wishlist.items` — `undefined`:
  * кнопка не малюється взагалі, а не в невизначеному стані «додати чи
- * прибрати» — членства ще просто не видно.
+ * прибрати» — членства ще просто не виднa
  */
 export function WishlistButton({
   work,

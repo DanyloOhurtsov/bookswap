@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import { loginRequestSchema, sessionResponseSchema } from '@bookswap/shared'
-import { TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { validate, type FieldErrors } from '../lib/validation'
+import { TextField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { validate, type FieldErrors } from '../../lib/validation'
 
 export default function LoginPage() {
   const router = useRouter()

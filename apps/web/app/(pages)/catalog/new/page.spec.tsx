@@ -21,13 +21,13 @@ import NewBookPage from './page'
  * майстра. Сесія й роутер мокаються окремо: це не предмет цього тесту.
  */
 
-jest.mock('../../lib/api', () => {
-  const actual = jest.requireActual<typeof import('../../lib/api')>('../../lib/api')
+jest.mock('@/app/lib/api', () => {
+  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn() }
 })
 
-jest.mock('../../lib/use-session', () => ({
+jest.mock('@/app/lib/use-session', () => ({
   useSession: () => ({
     state: { status: 'authenticated', user: { id: 'me', name: 'Тест', email: 't@example.com' } },
     reload: jest.fn(),
@@ -42,7 +42,7 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => searchParams,
 }))
 
-const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('../../lib/api')
+const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('@/app/lib/api')
 
 /** Валідний ISBN-13 (перевірено `isValidIsbn13`): 978-3-16-148410 + контрольна цифра 0. */
 const CANDIDATE_ISBN = '9783161484100'
@@ -547,7 +547,7 @@ describe('гілка «немає збігів»', () => {
 
 describe('помилки провайдера й rate limiting', () => {
   it('429 на пошуку кандидатів — зрозуміле повідомлення, а не сирий текст ThrottlerException', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('../../lib/api')>('../../lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => {
@@ -566,7 +566,7 @@ describe('помилки провайдера й rate limiting', () => {
   })
 
   it('504 на lookup — некритична підказка, кандидати все одно показуються', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('../../lib/api')>('../../lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => ({ candidates: [] }),
@@ -591,7 +591,7 @@ describe('помилки провайдера й rate limiting', () => {
   })
 
   it('502 помилка провайдера на lookup — та сама некритична підказка', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('../../lib/api')>('../../lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => ({ candidates: [] }),

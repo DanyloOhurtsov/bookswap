@@ -30,20 +30,20 @@ import {
   type Visibility,
   type WorkDetailResponse,
 } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '../../components/book'
-import { SelectField, TextAreaField, TextField } from '../../components/form-field'
-import { FormStatus } from '../../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { describeAddBookError } from '../../lib/catalog-errors'
+import { AuthorLine, EditionLine } from '@/components/BookParts'
+import { TextField, SelectField, TextAreaField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
+import { describeAddBookError } from '../../../lib/catalog-errors'
 import {
   CONDITION_LABELS,
   EDITION_FORMAT_LABELS,
   LANGUAGE_HINTS,
   VISIBILITY_LABELS,
-} from '../../lib/labels'
-import { mapLookupResultToDraft } from '../../lib/lookup-mapping'
-import { useSession } from '../../lib/use-session'
-import { validate, type FieldErrors } from '../../lib/validation'
+} from '../../../lib/labels'
+import { mapLookupResultToDraft } from '../../../lib/lookup-mapping'
+import { useSession } from '../../../lib/use-session'
+import { validate, type FieldErrors } from '../../../lib/validation'
 
 /**
  * §6.3, кроки 1–5: спершу пошук дублікатів (Етап 7c), потім — залежно від того,

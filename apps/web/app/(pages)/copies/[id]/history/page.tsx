@@ -3,12 +3,12 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
-import { AuthorLine, EditionLine } from '../../../components/book'
-import { FormStatus } from '../../../components/form-status'
-import { HistoryEntryLine } from '../../../components/history'
-import { CONDITION_LABELS, COPY_STATUS_LABELS } from '../../../lib/labels'
-import { useCopyHistory } from '../../../lib/use-history'
-import { useSession } from '../../../lib/use-session'
+import { AuthorLine, EditionLine } from '@/components/BookParts'
+import { useCopyHistory } from '@/app/lib/use-history'
+import { useSession } from '@/app/lib/use-session'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { CONDITION_LABELS, COPY_STATUS_LABELS } from '@/app/lib/labels'
+import { HistoryEntryLine } from '@/components/HistoryEntryLine'
 
 /**
  * §6.6: історія примірника — усі його лоани в хронології.
