@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --fg: #16130f;
   --bg: #fbfaf8;
   --bookswap-muted: #6b6459;
@@ -47,20 +47,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #f2efe9;
-    --bg: #16130f;
-    --bookswap-muted: #a49b8d;
-    --bookswap-accent: #6fd39b;
-    --line: #3a342c;
-    --field-bg: #1e1a15;
-    --ok: #6fd39b;
-    --warn: #e0b567;
-    --error: #f08a8a;
-  }
 }
 
 * {
@@ -113,12 +99,7 @@ h1 {
   margin-bottom: 2rem;
 }
 
-a {
-  color: var(--bookswap-accent);
-}
-
 /* --- Форми ---------------------------------------------------------------- */
-
 .form {
   display: grid;
   gap: 1.25rem;
@@ -154,14 +135,13 @@ a {
 .field input:focus-visible,
 .field textarea:focus-visible,
 .field select:focus-visible,
-button:not([data-slot='button']):focus-visible,
+button:not([data-ui='button']):focus-visible,
 a:focus-visible {
   outline: 2px solid var(--bookswap-accent);
   outline-offset: 2px;
 }
 
-/* Помилка позначається не лише кольором: під полем є текст, і він звʼязаний
-   із інпутом через aria-describedby. */
+/* Помилка позначається не лише кольором: під полем є текст, і він звʼязаний із інпутом через aria-describedby. */
 .field input[aria-invalid='true'],
 .field textarea[aria-invalid='true'],
 .field select[aria-invalid='true'] {
@@ -195,7 +175,7 @@ a:focus-visible {
   font-weight: 400;
 }
 
-button:not([data-slot='button']) {
+button:not([data-ui='button']) {
   padding: 0.65rem 1.1rem;
   font: inherit;
   font-weight: 600;
@@ -206,7 +186,7 @@ button:not([data-slot='button']) {
   cursor: pointer;
 }
 
-button:not([data-slot='button']):disabled {
+button:not([data-ui='button']):disabled {
   opacity: 0.6;
   cursor: progress;
 }
@@ -227,7 +207,6 @@ button:not([data-slot='button']):disabled {
 }
 
 /* --- Повідомлення --------------------------------------------------------- */
-
 .alert {
   margin: 0 0 1.5rem;
   padding: 0.85rem 1rem;
@@ -284,7 +263,6 @@ button:not([data-slot='button']):disabled {
 }
 
 /* --- Люди й дружба -------------------------------------------------------- */
-
 .friends-section {
   margin-bottom: 2.5rem;
 }
@@ -306,8 +284,7 @@ button:not([data-slot='button']):disabled {
   border-radius: 1rem;
 }
 
-/* Порожній розділ — не пропуск у верстці, а речення. Інакше сторінка виглядає
-   зламаною там, де вона просто порожня. */
+/* Порожній розділ — не пропуск у верстці, а речення. Інакше сторінка виглядає зламаною там, де вона просто порожня. */
 .empty {
   margin: 0;
   padding: 0.85rem 1rem;
@@ -403,7 +380,6 @@ button:not([data-slot='button']):disabled {
 }
 
 /* --- Підтвердження -------------------------------------------------------- */
-
 .dialog {
   max-width: 28rem;
   padding: 1.25rem 1.5rem;
@@ -435,7 +411,6 @@ button:not([data-slot='button']):disabled {
 }
 
 /* --- Каталог і бібліотека -------------------------------------------------- */
-
 .books {
   margin: 0 0 1.5rem;
   padding: 0;
@@ -681,6 +656,16 @@ button:not([data-slot='button']):disabled {
 }
 
 .dark {
+  color-scheme: dark;
+  --fg: #f2efe9;
+  --bg: #16130f;
+  --bookswap-muted: #a49b8d;
+  --bookswap-accent: #6fd39b;
+  --line: #3a342c;
+  --field-bg: #1e1a15;
+  --ok: #6fd39b;
+  --warn: #e0b567;
+  --error: #f08a8a;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

@@ -8,9 +8,7 @@ export default function HomePage() {
   return (
     <main className="page">
       <h1>BookSwap</h1>
-      <p className="lede">
-        Сервіс обміну фізичними книжками. Готові акаунт, профіль, дружба, каталог, особиста бібліотека, позичання з історією та сповіщення в застосунку.
-      </p>
+      <p className="lede">Сервіс обміну фізичними книжками.</p>
       <HealthStatus />
     </main>
   )

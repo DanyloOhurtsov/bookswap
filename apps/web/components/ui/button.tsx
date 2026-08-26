@@ -18,6 +18,9 @@ const buttonVariants = cva(
         destructive:
           'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40',
         link: 'text-primary underline-offset-4 hover:underline',
+        unstyled: '',
+        clear:
+          'bg-transparent text-foreground hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_5%)] aria-expanded:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_5%)] aria-expanded:text-foreground dark:hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_10%)] dark:aria-expanded:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_10%)] size-no_size:rounded-none',
       },
       size: {
         default:
@@ -31,6 +34,7 @@ const buttonVariants = cva(
         'icon-sm':
           'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
         'icon-lg': 'size-9',
+        no_size: 'p-0 h-auto gap-0 [&_svg]:size-0 [&_svg]:m-0',
       },
     },
     defaultVariants: {
@@ -49,7 +53,13 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-ui="button"
+      className={cn(
+        variant === 'unstyled'
+          ? 'm-0 inline-flex h-auto w-fit appearance-none items-center border-0 bg-transparent p-0 text-inherit shadow-none [font:inherit]'
+          : buttonVariants({ variant, size }),
+        className,
+      )}
       {...props}
     />
   )
