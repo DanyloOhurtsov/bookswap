@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { AccessModule } from './access/access.module'
+import { AnalyticsModule } from './analytics/analytics.module'
 import { AuthModule } from './auth/auth.module'
 import { CatalogModule } from './catalog/catalog.module'
 import { validateEnv } from './config/env.validation'
@@ -51,6 +52,7 @@ const ROOT_ENV_PATH = resolve(__dirname, '../../../.env')
       ],
     }),
     PrismaModule,
+    AnalyticsModule,
     EmailModule,
     // Транспорт Telegram — глобальний і без доменних залежностей, як і пошта.
     // Сам бот (`TelegramModule`) підключається нижче, після `LoansModule`.

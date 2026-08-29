@@ -66,6 +66,7 @@ model User {
   wishlist           WishlistItem[]
   notifications      Notification[]
   notificationPrefs  NotificationPreference[]
+  productEvents      ProductEvent[]
 
   @@index([displayName])
 }
@@ -610,4 +611,32 @@ enum DeliveryStatus {
   PENDING
   SENT
   FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Stage 8a — product analytics (docs/plan/stage-8-activation.md, §2)
+// ---------------------------------------------------------------------------
+
+/// Один додатковий запис поруч із вже наявними доменними мутаціями (§1, §3
+/// stage-8-activation.md). Навмисно без FK на Copy/Loan/Friendship/Edition/Work —
+/// подія має пережити hard delete цих сутностей. `type` — String, не Prisma-enum:
+/// закритий набір значень і Zod-схеми `properties` живуть у apps/api/src/analytics/**
+/// (§2.5), а не тут.
+model ProductEvent {
+  id            String   @id @default(cuid())
+  type          String
+  properties    Json
+  schemaVersion Int      @default(1)
+  /// Opaque/pseudonymous, §2.2 — жодного domain ID у відкритому вигляді.
+  dedupeKey     String   @unique
+  occurredAt    DateTime @default(now())
+
+  /// §2.1: навмисне відхилення від конвенції — SetNull, не Cascade. Подія
+  /// переживає видалення User; агрегати не мають ставати неправильними, коли
+  /// один користувач із когорти видалить акаунт.
+  subjectUserId String?
+  subjectUser   User?   @relation(fields: [subjectUserId], references: [id], onDelete: SetNull)
+
+  @@index([type, occurredAt])
+  @@index([subjectUserId, type])
 }
