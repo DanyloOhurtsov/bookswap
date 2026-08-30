@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
-import { SessionBoundary, Shell, CatalogSearch } from '@/components/index'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
+import { CatalogSearch } from '@/components/Catalog/CatalogSearch'
 
 /**
  * §6.3, кроки 1–2: людина вводить назву або ISBN і бачить «Можливо, це одна з

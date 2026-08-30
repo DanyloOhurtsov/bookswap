@@ -14,8 +14,8 @@ import {
 } from '@bookswap/shared'
 import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import { useFriends } from '@/app/lib/use-friends'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/Friends/UserAvatar'
 import {
   Sheet,
   SheetContent,
@@ -397,23 +397,6 @@ function SearchResultAction({
     case 'BLOCKED_ME':
       return null
   }
-}
-
-function UserAvatar({ user }: { user: PublicUser }) {
-  const initials = user.displayName
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => Array.from(part)[0] ?? '')
-    .join('')
-    .toLocaleUpperCase('uk-UA')
-
-  return (
-    <Avatar size="lg">
-      {user.avatarUrl !== null && <AvatarImage src={user.avatarUrl} alt="" />}
-      <AvatarFallback>{initials || '?'}</AvatarFallback>
-    </Avatar>
-  )
 }
 
 function SearchSkeleton() {

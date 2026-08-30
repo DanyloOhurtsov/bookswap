@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession } from '@/app/lib/use-session'
-import { NavContent } from '@/components/index'
+import { NavContent } from '@/components/NavBar/NavBarContent'
 
 export const NavBar = () => {
   const { state } = useSession()

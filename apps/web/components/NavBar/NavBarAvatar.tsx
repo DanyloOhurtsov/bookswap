@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { Me } from '@bookswap/shared'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/index'
+import { Button } from '@/components/ui/button'
 import { NAVBAR_PROFILE_LINKS } from '@/constants/navigation'
 import {
   DropdownMenu,

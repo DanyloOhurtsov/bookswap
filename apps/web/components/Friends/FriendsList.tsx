@@ -1,6 +1,7 @@
 import type { Friend, FriendRequest, PublicUser } from '@bookswap/shared'
 import { ChevronDownIcon, SendIcon, UserRoundCheckIcon, UsersIcon } from 'lucide-react'
-import { FriendRow, FriendRequestRow } from '@/components/index'
+import { FriendRow } from '@/components/Friends/FriendRow'
+import { FriendRequestRow } from '@/components/Friends/FriendRequestRow'
 
 interface FriendsListProps {
   friends: Friend[]

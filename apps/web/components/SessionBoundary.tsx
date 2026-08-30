@@ -6,7 +6,8 @@ import { useEffect, type ReactNode } from 'react'
 import type { Me } from '@bookswap/shared'
 import { useSession } from '@/app/lib/use-session'
 import { assertNever } from '@/app/lib/assert-never'
-import { Shell, type ShellProps, FormStatus } from '@/components/index'
+import { Shell, type ShellProps } from '@/components/Shell'
+import { FormStatus } from '@/components/Form/FormStatus'
 
 export interface AuthenticatedSession {
   user: Me

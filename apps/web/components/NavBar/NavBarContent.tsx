@@ -2,7 +2,10 @@ import Link from 'next/link'
 import type { Me } from '@bookswap/shared'
 import { type SessionState } from '@/app/lib/use-session'
 import { NAVBAR_LINKS_AUTH, NAVBAR_LINKS_GUEST } from '@/constants/navigation'
-import { NavBarAvatar, NavBarNotifications, NavBarLogo, ThemeSwitcher } from '@/components/index'
+import { NavBarAvatar } from '@/components/NavBar/NavBarAvatar'
+import { NavBarNotifications } from '@/components/NavBar/NavBarNotifications'
+import { NavBarLogo } from '@/components/NavBar/NavBarLogo'
+import { ThemeSwitcher } from '@/components/ThemeSwitcher'
 
 const NavContent = ({ state }: { state: SessionState }) => {
   switch (state.status) {

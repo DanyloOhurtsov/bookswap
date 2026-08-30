@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
-import { Shell, SessionBoundary, AddBookFlow } from '@/components/index'
+import { Shell } from '@/components/Shell'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { AddBookFlow } from '@/components/Catalog/AddBook/AddBookFlow'
 
 export default function NewBookPage() {
   return (

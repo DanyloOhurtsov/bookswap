@@ -13,14 +13,11 @@ import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import { assertNever } from '@/app/lib/assert-never'
 import { useFriends } from '@/app/lib/use-friends'
 import { validate, type FieldErrors } from '@/app/lib/validation'
-import {
-  Skeleton,
-  Button,
-  ConfirmDialog,
-  FriendsSearch,
-  type SearchMode,
-  FriendsList,
-} from '@/components/index'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { FriendsSearch, type SearchMode } from '@/components/Friends/FriendsSearch'
+import { FriendsList } from '@/components/Friends/FriendsList'
 
 interface SearchQuery {
   mode: SearchMode

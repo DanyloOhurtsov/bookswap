@@ -1,7 +1,7 @@
 'use client'
 
 import type { Work, WorkAuthor } from '@bookswap/shared'
-import { FormStatus } from '@/components/index'
+import { FormStatus } from '@/components/Form/FormStatus'
 import { WishlistController } from '@/app/lib/use-wishlist'
 
 /**

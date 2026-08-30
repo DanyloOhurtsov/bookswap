@@ -6,14 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { FieldErrors, validate } from '@/app/lib/validation'
 import { useCatalogSearch } from '@/app/lib/use-catalog'
 import { catalogSearchRequestSchema } from '@bookswap/shared'
-import {
-  Shell,
-  FormStatus,
-  TextField,
-  CatalogItem,
-  EmptyState,
-  LoadingState,
-} from '@/components/index'
+import { Shell } from '@/components/Shell'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { TextField } from '@/components/Form/FormFields'
+import { CatalogItem } from '@/components/Catalog/CatalogItem'
+import { EmptyState, LoadingState } from '@/components/PageState'
 
 function CatalogSearch() {
   const router = useRouter()

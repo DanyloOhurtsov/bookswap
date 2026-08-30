@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
-import { FriendsPageContent, SessionBoundary, Shell } from '@/components/index'
+import { FriendsPageContent } from '@/components/Friends/FriendsPageContent'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 
 export default function FriendsPage() {
   const cta = (

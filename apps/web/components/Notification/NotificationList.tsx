@@ -3,16 +3,12 @@
 import { useState } from 'react'
 import { useNotifications } from '@/app/lib/use-notifications'
 import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
-import {
-  NotificationItem,
-  SegmentedControl,
-  type SegmentedOption,
-  Button,
-  FormStatus,
-  Shell,
-  EmptyState,
-  LoadingState,
-} from '@/components/index'
+import { NotificationItem } from '@/components/Notification/NotificationItem'
+import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
+import { Button } from '@/components/ui/button'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { Shell } from '@/components/Shell'
+import { EmptyState, LoadingState } from '@/components/PageState'
 
 type NotificationView = 'all' | 'unread'
 

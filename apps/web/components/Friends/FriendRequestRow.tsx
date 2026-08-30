@@ -1,7 +1,8 @@
 import type { FriendRequest } from '@bookswap/shared'
 import { CheckIcon, XIcon } from 'lucide-react'
 import { formatDate } from '@/app/lib/labels'
-import { Button, UserAvatar } from '@/components/index'
+import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/Friends/UserAvatar'
 
 interface FriendRequestRowProps {
   request: FriendRequest

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/index'
+import { Button } from '@/components/ui/button'
 
 interface SegmentedOption<Value extends string> {
   value: Value

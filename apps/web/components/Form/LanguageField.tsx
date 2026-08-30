@@ -1,7 +1,7 @@
 'use client'
 
 import { LANGUAGE_HINTS } from '@/app/lib/labels'
-import { TextField } from '@/components/index'
+import { TextField } from '@/components/Form/FormFields'
 
 interface LanguageFieldProps {
   id: string

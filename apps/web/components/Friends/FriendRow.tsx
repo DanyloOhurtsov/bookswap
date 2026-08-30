@@ -2,7 +2,8 @@ import Link from 'next/link'
 import type { Friend } from '@bookswap/shared'
 import { BanIcon, BookOpenIcon, EllipsisVerticalIcon, UserMinusIcon } from 'lucide-react'
 import { formatDate } from '@/app/lib/labels'
-import { Button, UserAvatar } from '@/components/index'
+import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/Friends/UserAvatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
