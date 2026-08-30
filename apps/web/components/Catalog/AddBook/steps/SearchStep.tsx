@@ -40,13 +40,13 @@ export function SearchStep({
 }: {
   initialQuery: string
   onFoundEdition: (workId: string, title: string, editionId: string) => void
-  onFoundWork: (
-    workId: string,
-    title: string,
-    isbn?: string,
-    lookup?: BookLookupResult,
-    existingTranslations?: Translation[],
-  ) => void
+  onFoundWork: (found: {
+    workId: string
+    title: string
+    isbn?: string
+    lookup?: BookLookupResult
+    existingTranslations?: Translation[]
+  }) => void
   onCreateNew: (initialTitle: string, isbn?: string, lookup?: BookLookupResult) => void
 }) {
   const [query, setQuery] = useState(initialQuery)
@@ -159,13 +159,13 @@ export function SearchStep({
                   // (§6.3 п.12) їдуть далі разом із вибором — інакше нове
                   // Edition/Translation губить чернетку, підставлену на кроці
                   // пошуку.
-                  onFoundWork(
-                    candidate.work.id,
-                    candidate.work.title,
-                    searchedIsbn,
+                  onFoundWork({
+                    workId: candidate.work.id,
+                    title: candidate.work.title,
+                    isbn: searchedIsbn,
                     lookup,
-                    candidate.translations,
-                  )
+                    existingTranslations: candidate.translations,
+                  })
                 }}
               />
             ))}

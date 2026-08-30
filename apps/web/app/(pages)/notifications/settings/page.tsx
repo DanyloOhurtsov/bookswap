@@ -13,9 +13,9 @@ import {
 } from '@bookswap/shared'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { assertNever } from '../../../lib/assert-never'
-import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
-import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '../../../lib/labels'
+import { assertNever } from '@/app/lib/assert-never'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
+import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '@/app/lib/labels'
 import {
   changedCells,
   channelStates,
@@ -26,9 +26,9 @@ import {
   toggleCell,
   type ChannelState,
   type PreferenceMatrix,
-} from '../../../lib/notification-preferences'
-import { displayDecision } from '../../../lib/resource-state'
-import { useNotificationPreferences } from '../../../lib/use-notification-preferences'
+} from '@/app/lib/notification-preferences'
+import { displayDecision } from '@/app/lib/resource-state'
+import { useNotificationPreferences } from '@/app/lib/use-notification-preferences'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
 

@@ -14,8 +14,8 @@ import { SelectField, TextAreaField, TextField } from '@/components/Form/FormFie
 import { FormStatus } from '@/components/Form/FormStatus'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { validate, type FieldErrors } from '../../lib/validation'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
+import { validate, type FieldErrors } from '@/app/lib/validation'
 
 const VISIBILITY_LABELS: Record<Visibility, string> = {
   PUBLIC: 'Публічна — бачить будь-хто',

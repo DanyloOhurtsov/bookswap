@@ -13,11 +13,11 @@ import { TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
-import { assertNever } from '../../../../lib/assert-never'
-import { ApiRequestError, apiRequest, describeError } from '../../../../lib/api'
-import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '../../../../lib/labels'
-import { useFriendLibrary } from '../../../../lib/use-library'
-import { validate, type FieldErrors } from '../../../../lib/validation'
+import { assertNever } from '@/app/lib/assert-never'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
+import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '@/app/lib/labels'
+import { useFriendLibrary } from '@/app/lib/use-library'
+import { validate, type FieldErrors } from '@/app/lib/validation'
 
 /**
  * §6.5: бібліотека іншої людини.

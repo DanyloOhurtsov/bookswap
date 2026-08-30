@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import type { Work, WorkAuthor } from '@bookswap/shared'
+import type * as ApiModule from '@/app/lib/api'
 import WishlistPage from './page'
 
 /**
@@ -14,7 +15,7 @@ import WishlistPage from './page'
  */
 
 jest.mock('@/app/lib/api', () => {
-  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+  const actual = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn() }
 })

@@ -79,11 +79,13 @@ Do not introduce Redis, JWT, GraphQL, or microservices.
 
 ## Workflow
 
-- Work on the branch named in the stage prompt. Check with `git branch --show-current`;
-  if it's anything else, stop and tell me — change nothing.
+- Work on the branch named in my prompt. Check with `git branch --show-current`.
+  If the prompt names no branch, work on the current one. If it names a different
+  branch than the current one, stop and tell me — change nothing.
 - Never run `commit`, `push`, `merge`, `rebase`, or `stash`. I do those.
 - Never modify `docs/specification.md`.
-- Implement only the current sub-stage from `docs/plan/`. Don't start the next one.
+- Implement only the current sub-stage from `docs/plan/`, or the step explicitly
+  named in my prompt. Don't start the next one.
 - Verify with `./gate.sh` in the monorepo root. It resolves its own path, so it
   works from any cwd, but you must invoke it as `<repo-root>/gate.sh` — not `./gate.sh`
   from inside a package.

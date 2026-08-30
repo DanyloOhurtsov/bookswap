@@ -5,7 +5,7 @@ import { useState, type FormEvent } from 'react'
 import { acceptedResponseSchema, requestPasswordResetRequestSchema } from '@bookswap/shared'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { apiRequest, ApiRequestError, describeError } from '@/app/lib/api'
-import { FieldErrors, validate } from '@/app/lib/validation'
+import { type FieldErrors, validate } from '@/app/lib/validation'
 import { TextField } from '@/components/Form/FormFields'
 
 export default function ForgotPasswordPage() {

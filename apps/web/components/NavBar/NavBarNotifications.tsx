@@ -96,15 +96,11 @@ function NotificationsPanel({
   }
 
   function markRead(id: string): void {
-    void run(`read:${id}`, () =>
-      apiRequest(`/me/notifications/${id}/read`, { method: 'PATCH' }),
-    )
+    void run(`read:${id}`, () => apiRequest(`/me/notifications/${id}/read`, { method: 'PATCH' }))
   }
 
   function readAll(): void {
-    void run('read-all', () =>
-      apiRequest('/me/notifications/read-all', { method: 'POST' }),
-    )
+    void run('read-all', () => apiRequest('/me/notifications/read-all', { method: 'POST' }))
   }
 
   return (
@@ -177,7 +173,12 @@ function NotificationsPanel({
             <p className="text-sm text-destructive" role="alert">
               {resource.state.message}
             </p>
-            <Button type="button" size="sm" variant="outline" onClick={() => resource.reload()}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void resource.reload()}
+            >
               Спробувати ще раз
             </Button>
           </div>

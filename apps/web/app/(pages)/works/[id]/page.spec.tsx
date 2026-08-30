@@ -9,6 +9,7 @@ import type {
   WorkDetailResponse,
   WorkHistoryResponse,
 } from '@bookswap/shared'
+import type * as ApiModule from '@/app/lib/api'
 import WorkPage from './page'
 
 /**
@@ -21,7 +22,7 @@ import WorkPage from './page'
  */
 
 jest.mock('@/app/lib/api', () => {
-  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+  const actual = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn(), apiRequestWithRedirect: jest.fn() }
 })

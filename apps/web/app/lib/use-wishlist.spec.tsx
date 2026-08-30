@@ -3,6 +3,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import type { WishlistItem, Work, WorkAuthor } from '@bookswap/shared'
+import type * as ApiModule from './api'
 import { useWishlist } from './use-wishlist'
 
 /**
@@ -16,7 +17,7 @@ import { useWishlist } from './use-wishlist'
  */
 
 jest.mock('./api', () => {
-  const actual = jest.requireActual<typeof import('./api')>('./api')
+  const actual = jest.requireActual<typeof ApiModule>('./api')
 
   return { ...actual, apiRequest: jest.fn() }
 })
@@ -77,7 +78,7 @@ interface RequestKey {
 function bodyWorkId(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null || !('workId' in body)) return undefined
 
-  const workId = (body as { workId: unknown }).workId
+  const workId = body.workId
 
   return typeof workId === 'string' ? workId : undefined
 }
@@ -354,21 +355,21 @@ it('mutation success + confirmation reload failure → committed стан лиш
   let getCallCount = 0
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
         getCallCount += 1
         // 1-й GET: початкове завантаження. 2-й: confirmation reload після
         // успішного add(A) — провалюється.
-        if (getCallCount === 2) throw new Error('reload failed')
+        if (getCallCount === 2) return Promise.reject(new Error('reload failed'))
 
-        return { items: [] }
+        return Promise.resolve({ items: [] })
       }
 
-      if (path === '/me/wishlist' && method === 'POST') return undefined
+      if (path === '/me/wishlist' && method === 'POST') return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 
@@ -398,7 +399,7 @@ it('наступний успішний reload узгоджує й прибир�
   let getCallCount = 0
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string; body?: unknown } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string; body?: unknown } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
@@ -406,14 +407,14 @@ it('наступний успішний reload узгоджує й прибир�
         // 1-й GET: початкове завантаження, порожньо.
         // 2-й GET: confirmation reload після успішного add(A) — провалюється.
         // 3-й GET: reload після успішного add(B) — повертає обидва.
-        if (getCallCount === 2) throw new Error('reload failed')
+        if (getCallCount === 2) return Promise.reject(new Error('reload failed'))
 
-        return { items: getCallCount >= 3 ? [item(workA), item(workB)] : [] }
+        return Promise.resolve({ items: getCallCount >= 3 ? [item(workA), item(workB)] : [] })
       }
 
-      if (path === '/me/wishlist' && method === 'POST') return undefined
+      if (path === '/me/wishlist' && method === 'POST') return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 
@@ -496,19 +497,19 @@ it('committed add(A) + невдалий reload → isPending false, isMember tru
   let getCallCount = 0
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
         getCallCount += 1
-        if (getCallCount === 2) throw new Error('reload failed')
+        if (getCallCount === 2) return Promise.reject(new Error('reload failed'))
 
-        return { items: [] }
+        return Promise.resolve({ items: [] })
       }
 
-      if (path === '/me/wishlist' && method === 'POST') return undefined
+      if (path === '/me/wishlist' && method === 'POST') return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 
@@ -529,19 +530,20 @@ it('committed remove(A) + невдалий reload → isPending false, isMember 
   let getCallCount = 0
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
         getCallCount += 1
-        if (getCallCount === 2) throw new Error('reload failed')
+        if (getCallCount === 2) return Promise.reject(new Error('reload failed'))
 
-        return { items: [item(workA)] }
+        return Promise.resolve({ items: [item(workA)] })
       }
 
-      if (path === `/me/wishlist/${workA.id}` && method === 'DELETE') return undefined
+      if (path === `/me/wishlist/${workA.id}` && method === 'DELETE')
+        return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 
@@ -812,19 +814,19 @@ it('дублікат тієї самої дії, поки committed ще не re
   }
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
         getCallCount += 1
-        if (getCallCount === 2) throw new Error('reload failed')
+        if (getCallCount === 2) return Promise.reject(new Error('reload failed'))
 
-        return { items: [] }
+        return Promise.resolve({ items: [] })
       }
 
-      if (path === '/me/wishlist' && method === 'POST') return undefined
+      if (path === '/me/wishlist' && method === 'POST') return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 
@@ -854,7 +856,7 @@ it('розмонтування під час CONFIRMATION reload (не само�
   const getGates: Deferred<{ items: WishlistItem[] }>[] = []
 
   mockApiRequest.mockImplementation(
-    async (path: string, options: { method?: string } = {}): Promise<unknown> => {
+    (path: string, options: { method?: string } = {}): Promise<unknown> => {
       const method = options.method ?? 'GET'
 
       if (path === '/me/wishlist' && method === 'GET') {
@@ -865,9 +867,9 @@ it('розмонтування під час CONFIRMATION reload (не само�
         return gate.promise
       }
 
-      if (path === '/me/wishlist' && method === 'POST') return undefined
+      if (path === '/me/wishlist' && method === 'POST') return Promise.resolve(undefined)
 
-      throw new Error(`no fake response for ${path} ${method}`)
+      return Promise.reject(new Error(`no fake response for ${path} ${method}`))
     },
   )
 

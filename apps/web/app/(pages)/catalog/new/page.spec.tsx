@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import type { Edition, Translation, Work, WorkAuthor, WorkDetailResponse } from '@bookswap/shared'
+import type * as ApiModule from '@/app/lib/api'
 import NewBookPage from './page'
 
 /**
@@ -22,7 +23,7 @@ import NewBookPage from './page'
  */
 
 jest.mock('@/app/lib/api', () => {
-  const actual = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+  const actual = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
   return { ...actual, apiRequest: jest.fn() }
 })
@@ -115,7 +116,11 @@ function routeApiRequest(handlers: Record<string, (options: { body?: unknown }) 
 
     if (match === undefined) throw new Error(`Немає фейкової відповіді для ${path}`)
 
-    return match[1](options)
+    // `await` тут не косметика: хендлери кидають синхронно (тести на 429/502/504
+    // кидають ApiRequestError), а від мока чекають rejection. Саме `async` це й
+    // забезпечує, тож функція лишається async — а `await` робить це видимим
+    // і для `require-await`.
+    return await match[1](options)
   })
 }
 
@@ -569,7 +574,7 @@ describe('гілка «немає збігів»', () => {
 
 describe('помилки провайдера й rate limiting', () => {
   it('429 на пошуку кандидатів — зрозуміле повідомлення, а не сирий текст ThrottlerException', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => {
@@ -588,7 +593,7 @@ describe('помилки провайдера й rate limiting', () => {
   })
 
   it('504 на lookup — некритична підказка, кандидати все одно показуються', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => ({ candidates: [] }),
@@ -613,7 +618,7 @@ describe('помилки провайдера й rate limiting', () => {
   })
 
   it('502 помилка провайдера на lookup — та сама некритична підказка', async () => {
-    const { ApiRequestError } = jest.requireActual<typeof import('@/app/lib/api')>('@/app/lib/api')
+    const { ApiRequestError } = jest.requireActual<typeof ApiModule>('@/app/lib/api')
 
     routeApiRequest({
       '/catalog/search/candidates': () => ({ candidates: [] }),

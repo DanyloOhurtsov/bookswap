@@ -5,6 +5,13 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "preserve",
+
+    // §0.1. Живе тут, а не в tsconfig.base.json: apps/api і packages/shared —
+    // CommonJS-пакети ("type": "commonjs" + module: nodenext), і для них цей
+    // прапорець означає TS1295/TS1287 на кожному ESM-імпорті (1784 і 470 помилок
+    // відповідно), а не «пиши import type». Enforce для shared лишається на
+    // ESLint (@typescript-eslint/consistent-type-imports).
+    "verbatimModuleSyntax": true,
     "types": ["node", "react", "react-dom", "jest"],
     "allowJs": true,
     "noEmit": true,

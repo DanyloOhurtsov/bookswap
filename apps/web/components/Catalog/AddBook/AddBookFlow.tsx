@@ -84,7 +84,6 @@ function AddBookFlowController({
   presetWorkId: string | null
   initialQuery: string
 }) {
-
   const [step, setStep] = useState<AddBookStep>(() =>
     presetWorkId === null ? { kind: 'search' } : { kind: 'loading-work' },
   )
@@ -145,7 +144,7 @@ function AddBookFlowController({
           onFoundEdition={(workId, title, editionId) => {
             setStep({ kind: 'copy', workId, title, editionId })
           }}
-          onFoundWork={(workId, title, isbn, lookup, existingTranslations) => {
+          onFoundWork={({ workId, title, isbn, lookup, existingTranslations }) => {
             setStep({ kind: 'translation', workId, title, isbn, lookup, existingTranslations })
           }}
           onCreateNew={(initialTitle, isbn, lookup) => {

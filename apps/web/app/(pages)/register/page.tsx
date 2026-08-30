@@ -6,8 +6,8 @@ import { useState, type FormEvent } from 'react'
 import { PASSWORD_LIMITS, registerRequestSchema, sessionResponseSchema } from '@bookswap/shared'
 import { TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { validate, type FieldErrors } from '../../lib/validation'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
+import { validate, type FieldErrors } from '@/app/lib/validation'
 
 export default function RegisterPage() {
   const router = useRouter()

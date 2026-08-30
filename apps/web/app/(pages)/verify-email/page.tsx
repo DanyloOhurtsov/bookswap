@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { sessionResponseSchema } from '@bookswap/shared'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { assertNever } from '../../lib/assert-never'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { assertNever } from '@/app/lib/assert-never'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 
 type State =
   | { kind: 'ready' }

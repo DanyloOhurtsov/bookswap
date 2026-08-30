@@ -5,8 +5,8 @@ import { AuthorLine } from '@/components/BookParts'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
-import { assertNever } from '../../lib/assert-never'
-import { useWishlist } from '../../lib/use-wishlist'
+import { assertNever } from '@/app/lib/assert-never'
+import { useWishlist } from '@/app/lib/use-wishlist'
 
 /**
  * §6.5 і §8, підетап 7f: сторінка вішлиста — список творів і кнопка «Прибрати»

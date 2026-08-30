@@ -6,8 +6,8 @@ import { Suspense, useState, type FormEvent } from 'react'
 import { PASSWORD_LIMITS, confirmPasswordResetRequestSchema } from '@bookswap/shared'
 import { TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { validate, type FieldErrors } from '../../lib/validation'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
+import { validate, type FieldErrors } from '@/app/lib/validation'
 
 function ResetPasswordForm() {
   const router = useRouter()

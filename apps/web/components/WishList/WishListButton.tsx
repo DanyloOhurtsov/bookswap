@@ -2,7 +2,7 @@
 
 import type { Work, WorkAuthor } from '@bookswap/shared'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { WishlistController } from '@/app/lib/use-wishlist'
+import type { WishlistController } from '@/app/lib/use-wishlist'
 
 /**
  * Кнопка додати/прибрати твір із вішлиста (Етап 7f, DoD).

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation'
-import { ReactNode, Suspense, useState } from 'react'
+import { type ReactNode, Suspense, useState } from 'react'
 import {
   LOAN_ROLES,
   LOAN_STATUS,
@@ -19,14 +19,14 @@ import { EmptyState, LoadingState } from '@/components/PageState'
 import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import {
   CONDITION_LABELS,
   LOAN_ACTION_LABELS,
   LOAN_STATUS_LABELS,
   formatDate,
-} from '../../lib/labels'
-import { counterpartOf, roleOf, useLoan, useLoans } from '../../lib/use-loans'
+} from '@/app/lib/labels'
+import { counterpartOf, roleOf, useLoan, useLoans } from '@/app/lib/use-loans'
 
 /**
  * §5 і §8: усі позичання людини, з обох боків.

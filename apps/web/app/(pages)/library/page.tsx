@@ -25,15 +25,15 @@ import { EmptyState, LoadingState } from '@/components/PageState'
 import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
 import { SessionBoundary } from '@/components/SessionBoundary'
 import { Shell } from '@/components/Shell'
-import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import {
   CONDITION_LABELS,
   COPY_STATUS_LABELS,
   VISIBILITY_LABELS,
   formatDate,
-} from '../../lib/labels'
-import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../../lib/use-library'
-import { validate, type FieldErrors } from '../../lib/validation'
+} from '@/app/lib/labels'
+import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '@/app/lib/use-library'
+import { validate, type FieldErrors } from '@/app/lib/validation'
 
 /**
  * §6.4: особиста бібліотека.

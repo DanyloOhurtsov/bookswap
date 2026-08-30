@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FieldErrors, validate } from '@/app/lib/validation'
+import { type FieldErrors, validate } from '@/app/lib/validation'
 import { useCatalogSearch } from '@/app/lib/use-catalog'
 import { catalogSearchRequestSchema } from '@bookswap/shared'
 import { Shell } from '@/components/Shell'

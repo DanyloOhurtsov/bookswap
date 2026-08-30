@@ -18,7 +18,7 @@ describe('apiRequestWithRedirect', () => {
       ...response,
     })
 
-    global.fetch = mock as unknown as typeof fetch
+    global.fetch = mock
 
     return mock
   }
