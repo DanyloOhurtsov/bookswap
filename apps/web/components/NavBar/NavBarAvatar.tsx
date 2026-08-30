@@ -19,9 +19,7 @@ function getInitials(displayName: string): string {
   const first = Array.from(parts[0] ?? '')
   const last = Array.from(parts.at(-1) ?? '')
   const initials =
-    parts.length === 1
-      ? first.slice(0, 2).join('')
-      : `${first[0] ?? ''}${last[0] ?? ''}`
+    parts.length === 1 ? first.slice(0, 2).join('') : `${first[0] ?? ''}${last[0] ?? ''}`
 
   return initials.toLocaleUpperCase('uk-UA')
 }
@@ -31,10 +29,7 @@ export const NavBarAvatar = ({ user }: { user: Me }) => {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            variant="unstyled"
-            aria-label={`Відкрити меню профілю: ${user.displayName}`}
-          >
+          <Button variant="unstyled" aria-label={`Відкрити меню профілю: ${user.displayName}`}>
             <Avatar size="lg">
               {user.avatarUrl !== null && (
                 <AvatarImage src={user.avatarUrl} alt={user.displayName} />
