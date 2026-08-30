@@ -1,12 +1,15 @@
-# Етап 8 — Review, TranslationRating і Bayesian ranking (чернетка)
+# Архів — колишній Етап 8: Review, TranslationRating і Bayesian ranking
+
+> **Статус: відкладено, не реалізовувати як наступний етап.** Цей документ збережено
+> лише як технічне дослідження ratings. Його замінив активний
+> [Product Roadmap v2](../roadmap-v2.md). Ratings і Bayesian ranking повертаються
+> в роботу лише після виконання продуктового gate, описаного в актуальному roadmap.
 
 Нарізка на підетапи по одному коміту. Порядок обов'язковий: 8a дає схему для всіх,
 8b дає формулу для 8c/8d/8e, 8e потрібен для 8g.
 
-> **Статус: чернетка, не готова до реалізації.** Рекомендації Q1–Q2 та блокери
-> Q3–Q5 треба затвердити до початку 8a. Після цього рішення R1–R11 і Definition
-> of done слід синхронізувати з обраною стратегією та лише тоді вважати план
-> робочим.
+> **Історичний стан на момент архівації:** чернетка не була готова до реалізації;
+> рекомендації Q1–Q2 та блокери Q3–Q5 не були затверджені.
 
 **Передумова: борг флаку e2e закритий.** Етап 8 містить тести на транзакції,
 rollback і конкурентність — без довіри до гейта вони нічого не доводять.
@@ -19,18 +22,18 @@ rollback і конкурентність — без довіри до гейта
 видно фактичний стан `apps/api/prisma/schema.prisma`, і розійшлася з ним у десяти
 місцях. Нижче — що є насправді; DoD 8a нижче переписаний під це.
 
-| Твердження чернетки | Фактично в репозиторії |
-| --- | --- |
-| `TranslationRating` треба завести | **Вже є, і не з 7g, а з першої міграції** `20260815120206_init`. Поля: `id`, `translationId`, `userId`, `rating Int`, `text String?`, `createdAt`. |
-| unique `(userId, translationId)` | Є: `@@unique([translationId, userId])`, індекс `TranslationRating_translationId_userId_key`. Пара та сама, порядок полів інший — переробляти нема чого. |
-| `updatedAt` | **Немає.** Треба додати: R2 робить POST ідемпотентним upsert'ом, тобто оцінка редагується, і без `updatedAt` рядок не відрізнити від щойно створеного. Це відхилення від §4.7 — там поля немає, бо §4.7 не передбачала редагування оцінки перекладу. |
-| CHECK `rating BETWEEN 1 AND 5` у БД | **Немає** — ні на `TranslationRating`, ні на `Review`. Коментар `/// 1..5` у схемі є, обмеження немає. Треба додати обидва. |
-| `Translation.ratingAvg` nullable, `score` nullable, `ratingCount` default 0 | Фактично **всі три NOT NULL з дефолтом**: `score Float @default(0)`, `ratingAvg Float @default(0)`, `ratingCount Int @default(0)`. Див. R3 — рішення переглянуте. |
-| `Translation.scoreBasis` | **Немає.** Це не «загубилося», це нове поле, якого немає ні в §4.4, ні в §10.2. Див. R5. |
-| `Work.ratingAvg` / `ratingCount` | Є: `Float @default(0)` / `Int @default(0)`, NOT NULL. Узгоджені з R9 без правок. |
-| індекс під `(workId, score DESC)` | **Немає.** Є `@@index([workId, lang])`. Поки `sortTranslations()` сортує в пам'яті, цей індекс не матиме споживача; повернутися до нього треба лише разом із сортуванням у SQL. |
-| `Review` — заводити з нуля | **Багатша за припущення чернетки**: уже має `updatedAt`, `archivedAt`, `archivedByMergeSourceId` і частковий unique `one_active_review_per_work_user WHERE "archivedAt" IS NULL` (міграція `20260822074936_review_archive_on_merge`). **R1 уже підпертий схемою** — 8a на нього не витрачає нічого. |
-| контракти Review / TranslationRating / ранжований Translation у `packages/shared` | Немає жодного. `translationSchema` є і **навмисно** без `score`/`ratingAvg`/`ratingCount` — коментар у `contracts/catalog.ts` прямо каже «Ранг приїде разом зі §10 на етапі оцінок». |
+| Твердження чернетки                                                               | Фактично в репозиторії                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TranslationRating` треба завести                                                 | **Вже є, і не з 7g, а з першої міграції** `20260815120206_init`. Поля: `id`, `translationId`, `userId`, `rating Int`, `text String?`, `createdAt`.                                                                                                                                                  |
+| unique `(userId, translationId)`                                                  | Є: `@@unique([translationId, userId])`, індекс `TranslationRating_translationId_userId_key`. Пара та сама, порядок полів інший — переробляти нема чого.                                                                                                                                             |
+| `updatedAt`                                                                       | **Немає.** Треба додати: R2 робить POST ідемпотентним upsert'ом, тобто оцінка редагується, і без `updatedAt` рядок не відрізнити від щойно створеного. Це відхилення від §4.7 — там поля немає, бо §4.7 не передбачала редагування оцінки перекладу.                                                |
+| CHECK `rating BETWEEN 1 AND 5` у БД                                               | **Немає** — ні на `TranslationRating`, ні на `Review`. Коментар `/// 1..5` у схемі є, обмеження немає. Треба додати обидва.                                                                                                                                                                         |
+| `Translation.ratingAvg` nullable, `score` nullable, `ratingCount` default 0       | Фактично **всі три NOT NULL з дефолтом**: `score Float @default(0)`, `ratingAvg Float @default(0)`, `ratingCount Int @default(0)`. Див. R3 — рішення переглянуте.                                                                                                                                   |
+| `Translation.scoreBasis`                                                          | **Немає.** Це не «загубилося», це нове поле, якого немає ні в §4.4, ні в §10.2. Див. R5.                                                                                                                                                                                                            |
+| `Work.ratingAvg` / `ratingCount`                                                  | Є: `Float @default(0)` / `Int @default(0)`, NOT NULL. Узгоджені з R9 без правок.                                                                                                                                                                                                                    |
+| індекс під `(workId, score DESC)`                                                 | **Немає.** Є `@@index([workId, lang])`. Поки `sortTranslations()` сортує в пам'яті, цей індекс не матиме споживача; повернутися до нього треба лише разом із сортуванням у SQL.                                                                                                                     |
+| `Review` — заводити з нуля                                                        | **Багатша за припущення чернетки**: уже має `updatedAt`, `archivedAt`, `archivedByMergeSourceId` і частковий unique `one_active_review_per_work_user WHERE "archivedAt" IS NULL` (міграція `20260822074936_review_archive_on_merge`). **R1 уже підпертий схемою** — 8a на нього не витрачає нічого. |
+| контракти Review / TranslationRating / ранжований Translation у `packages/shared` | Немає жодного. `translationSchema` є і **навмисно** без `score`/`ratingAvg`/`ratingCount` — коментар у `contracts/catalog.ts` прямо каже «Ранг приїде разом зі §10 на етапі оцінок».                                                                                                                |
 
 Ще три речі, що виявилися при звірці й впливають на нарізку:
 
@@ -68,7 +71,7 @@ rollback і конкурентність — без довіри до гейта
 - **R1. Архівовані рецензії (з R5 етапу 7g).** Review з `archivedAt != null` не читається,
   не редагується, не видаляється через API і не входить у `Work.ratingAvg/ratingCount`.
   Наявність архівованої рецензії не блокує створення нової — unique частковий.
-  *Схемою вже забезпечено (7g). 8a тут не робить нічого.*
+  _Схемою вже забезпечено (7g). 8a тут не робить нічого._
 - **R2. Форма API оцінки перекладу.** `POST /api/v1/translations/:id/ratings` — ідемпотентний
   upsert (створює або оновлює власну оцінку), `DELETE /api/v1/translations/:id/ratings/me` —
   видалення. Окремого PATCH немає: один користувач — одна оцінка, ресурс адресується власником.
@@ -84,13 +87,13 @@ rollback і конкурентність — без довіри до гейта
      у домені немає, тож nullable-колонка виражала б неіснуючий стан.
   3. «Немає оцінок» уже виражене через `ratingCount = 0` — другого способу сказати
      те саме не треба.
-  Cold start (§10.3) живе **в контракті**, не в колонці: `score` у відповіді
-  `number | null`, і сервер віддає `null` при `v < m`. Так UI фізично не може
-  показати ранг, якому не можна вірити (DoD 8e).
-  **Наслідок, який треба закрити:** новий `Translation`, доданий до твору, де вже є
-  оцінки, отримає `score = 0` за дефолтом і провалиться в кінець сортування, хоча
-  за формулою мав би отримати `C`. Тому `createTranslation` (8e) **зобов'язаний**
-  викликати перерахунок твору в тій самій транзакції.
+     Cold start (§10.3) живе **в контракті**, не в колонці: `score` у відповіді
+     `number | null`, і сервер віддає `null` при `v < m`. Так UI фізично не може
+     показати ранг, якому не можна вірити (DoD 8e).
+     **Наслідок, який треба закрити:** новий `Translation`, доданий до твору, де вже є
+     оцінки, отримає `score = 0` за дефолтом і провалиться в кінець сортування, хоча
+     за формулою мав би отримати `C`. Тому `createTranslation` (8e) **зобов'язаний**
+     викликати перерахунок твору в тій самій транзакції.
 - **R4. Поріг m.** `RATING_PRIOR_M`, дефолт 5, читається на момент перерахунку. Зміна m
   не перераховує історію — для цього CLI-команда з 8h.
 - **R5. Що таке C.** Каскад:
@@ -99,11 +102,11 @@ rollback і конкурентність — без довіри до гейта
   2. `GLOBAL` — середня по всіх Translation у базі. Використовується, коли Translation одна
      або в Work немає жодної оцінки.
   3. `NEUTRAL` — 3.0, коли в базі немає жодної оцінки взагалі.
-  Середня середніх не використовується — вона перезважує переклади з однією оцінкою.
-  **Чи записувати гілку в колонку `Translation.scoreBasis` — відкрите питання,
-  див. «Питання до затвердження», Q1.** Сама функція вибору повертає гілку в
-  будь-якому разі: без неї unit-тест 8b не відрізнить `WORK` від `GLOBAL`, коли
-  обидва дали близькі числа.
+     Середня середніх не використовується — вона перезважує переклади з однією оцінкою.
+     **Чи записувати гілку в колонку `Translation.scoreBasis` — відкрите питання,
+     див. «Питання до затвердження», Q1.** Сама функція вибору повертає гілку в
+     будь-якому разі: без неї unit-тест 8b не відрізнить `WORK` від `GLOBAL`, коли
+     обидва дали близькі числа.
 - **R6. Конкурентність. `SELECT "id" FROM "Work" WHERE "id" = $1 FOR UPDATE`
   всередині транзакції, ізоляція READ COMMITTED.** ~~pg_advisory_xact_lock~~ —
   чернетка пропонувала advisory lock; переглянуто. Підстави:
@@ -119,11 +122,11 @@ rollback і конкурентність — без довіри до гейта
   3. **`pg_advisory_xact_lock` приймає `bigint`,** а `Work.id` — cuid. Знадобився б
      хеш cuid → int64, тобто рукотворна можливість колізії двох різних творів на
      одному локу. `FOR UPDATE` бере рядок, який і є ресурсом.
-  Лок береться **до будь-якого INSERT/UPDATE/DELETE** Review або
-  TranslationRating, а не лише перед читанням агрегатів. Після локу треба повторно
-  перевірити зв'язок Translation → Work і канонічність Work, щоб конкурентний
-  merge не залишив запис на старому творі. Порядок при кількох творах —
-  `ORDER BY "id"`, як у `lockWorks`.
+     Лок береться **до будь-якого INSERT/UPDATE/DELETE** Review або
+     TranslationRating, а не лише перед читанням агрегатів. Після локу треба повторно
+     перевірити зв'язок Translation → Work і канонічність Work, щоб конкурентний
+     merge не залишив запис на старому творі. Порядок при кількох творах —
+     `ORDER BY "id"`, як у `lockWorks`.
 - **R7. Права й коди.** Недостатньо прав → 403 з `REVIEW_NOT_ELIGIBLE` / `RATING_NOT_ELIGIBLE`.
   Loan у статусі REQUESTED/APPROVED/HANDED_OVER права не дає — тільки RETURNED.
 - **R8. Змержені Work (з 7h).** Запис на змержений Work → 409 `WORK_MERGED` через
@@ -132,7 +135,7 @@ rollback і конкурентність — без довіри до гейта
 - **R9. Work.ratingAvg / ratingCount рахуються з Review**, не з TranslationRating.
   Активних (`archivedAt IS NULL`), за R1.
 - **R10. Тай-брейк ранжованого списку: `score DESC, ratingCount DESC, year ASC
-  (NULLS LAST), id ASC`.** Чернетка пропонувала `ratingCount DESC, id ASC`; сюди
+(NULLS LAST), id ASC`.** Чернетка пропонувала `ratingCount DESC, id ASC`; сюди
   вставлено наявний критерій за роком, бо він уже реалізований
   у `sortTranslations()` і покритий catalog e2e-тестом сортування за роком.
   Викидати робочий детермінований критерій заради коротшого списку немає підстав;
@@ -203,6 +206,7 @@ deadlock. **Блокує 8b/8c/8d/8h.**
 `packages/shared/**`, `apps/api/test/db/schema-objects.db-spec.ts`, `README.md`.
 
 Definition of done:
+
 - `TranslationRating` отримує `updatedAt` (Q2); решта полів уже є й не чіпається
 - CHECK на рівні БД: `translation_rating_range` (`rating BETWEEN 1 AND 5`) і
   `review_rating_range` — обидва дописані руками, як `loan_borrower_not_owner`
@@ -230,6 +234,7 @@ Definition of done:
 `apps/api/src/config/env.validation.ts`, `.env.example`, `README.md`.
 
 Definition of done:
+
 - чиста функція `computeScore({ R, v, m, C })` без залежностей від Prisma
 - функція вибору C за каскадом R5, повертає `{ value, basis }`
 - helper визначає канонічний Work, бере `FOR UPDATE` і повторно перевіряє
@@ -255,6 +260,7 @@ Definition of done:
 `packages/shared/**` (за потреби), `apps/api/test/**`.
 
 Definition of done:
+
 - `POST /api/v1/works/:id/reviews`, `PATCH /api/v1/reviews/:id`, `DELETE /api/v1/reviews/:id`
 - `GET /api/v1/works/:id/reviews` із пагінацією; архівовані не віддаються (R1).
   Читання рецензій — доповнення до §8 (там перелічені лише три записи вище), без
@@ -282,6 +288,7 @@ Definition of done:
 `packages/shared/**` (за потреби), `apps/api/test/**`.
 
 Definition of done:
+
 - `POST /api/v1/translations/:id/ratings` (upsert) і `DELETE .../ratings/me` за R2
 - rating валідується як ціле 1..5 і в DTO, і в БД (CHECK з 8a)
 - права за R7, але Copy/Loan має стосуватися Edition саме цього Translation;
@@ -305,6 +312,7 @@ Definition of done:
 Дозволено чіпати: `apps/api/src/catalog/**`, `packages/shared/**`, `apps/api/test/**`.
 
 Definition of done:
+
 - `translationSchema` і всі catalog mapper/API-відповіді атомарно переходять
   на розширену форму за R11
 - `GET /api/v1/works/:id/translations` і `GET /api/v1/works/:id` віддають сортування
@@ -327,6 +335,7 @@ Definition of done:
 Дозволено чіпати: `apps/web/**`.
 
 Definition of done:
+
 - список рецензій на сторінці Work, форма створення/редагування/видалення власної
 - форма використовує viewer metadata з Q5: недоступна, якщо прав немає, і показує
   зрозуміле пояснення чому; власний Review не залежить від поточної сторінки списку
@@ -340,6 +349,7 @@ Definition of done:
 Дозволено чіпати: `apps/web/**`.
 
 Definition of done:
+
 - віджет оцінки 1..5 на Translation, стан «моя оцінка» видимий, зняття оцінки доступне
 - ранжований список перекладів на сторінці Work (`TranslationCard` у
   `apps/web/app/works/[id]/page.tsx` уже показує ознаки §10.3 — додається ранг)
@@ -357,6 +367,7 @@ Definition of done:
 `apps/api/test/**`, `README.md`.
 
 Definition of done:
+
 - admin CLI `ratings:recompute [--work-id]` перераховує агрегати з нуля; без аргументу —
   по всіх Work, батчами, з прогресом (структура — за `cli/merge-works.ts` і
   `cli/merge-cli.module.ts`)

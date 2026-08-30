@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { sessionResponseSchema } from '@bookswap/shared'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { assertNever } from '../../lib/assert-never'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
 
 type State =
@@ -41,15 +42,31 @@ function VerifyEmail() {
     )
   }
 
-  if (state.kind === 'confirmed') {
-    return (
-      <>
-        <FormStatus success={`Адресу ${state.email} підтверджено.`} />
-        <p className="form__aside">
-          <Link href="/profile">До профілю</Link>
-        </p>
-      </>
-    )
+  let failed = false
+  let failure: unknown
+  let pending = false
+
+  switch (state.kind) {
+    case 'ready':
+      break
+    case 'confirming':
+      pending = true
+      break
+    case 'failed':
+      failed = true
+      failure = state.error
+      break
+    case 'confirmed':
+      return (
+        <>
+          <FormStatus success={`Адресу ${state.email} підтверджено.`} />
+          <p className="form__aside">
+            <Link href="/profile">До профілю</Link>
+          </p>
+        </>
+      )
+    default:
+      return assertNever(state)
   }
 
   async function confirm(): Promise<void> {
@@ -71,11 +88,9 @@ function VerifyEmail() {
     }
   }
 
-  const pending = state.kind === 'confirming'
-
   return (
     <>
-      {state.kind === 'failed' && <FormStatus error={state.error} />}
+      {failed && <FormStatus error={failure} />}
 
       <p className="lede">
         Натисніть кнопку, щоб підтвердити адресу. Посилання одноразове й діє добу.
@@ -93,7 +108,7 @@ function VerifyEmail() {
         </button>
       </form>
 
-      {state.kind === 'failed' && (
+      {failed && (
         <p className="form__aside">
           Якщо посилання застаріло або вже використане — замовте новий лист у{' '}
           <Link href="/profile">профілі</Link>.

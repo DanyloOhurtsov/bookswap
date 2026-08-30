@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useParams } from 'next/navigation'
+import { useState } from 'react'
 import {
   createLoanRequestSchema,
   type VisibleCopy,
@@ -11,10 +11,12 @@ import {
 import { AuthorLine, EditionLine } from '@/components/BookParts'
 import { TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
+import { assertNever } from '../../../../lib/assert-never'
 import { ApiRequestError, apiRequest, describeError } from '../../../../lib/api'
 import { CONDITION_LABELS, COPY_STATUS_LABELS, formatDate } from '../../../../lib/labels'
 import { useFriendLibrary } from '../../../../lib/use-library'
-import { useSession } from '../../../../lib/use-session'
 import { validate, type FieldErrors } from '../../../../lib/validation'
 
 /**
@@ -32,15 +34,18 @@ import { validate, type FieldErrors } from '../../../../lib/validation'
  */
 export default function FriendLibraryPage() {
   const parameters = useParams<{ id: string }>()
-  const router = useRouter()
-  const { state: session, reload: reloadSession } = useSession()
-  const { state, reload } = useFriendLibrary(parameters.id)
+
+  return (
+    <SessionBoundary title="Бібліотека">
+      <FriendLibraryScreen userId={parameters.id} />
+    </SessionBoundary>
+  )
+}
+
+function FriendLibraryScreen({ userId }: { userId: string }) {
+  const { state, reload } = useFriendLibrary(userId)
   const [failure, setFailure] = useState<unknown>()
   const [busyKey, setBusyKey] = useState<string>()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
 
   async function requestCopy(copyId: string, body: Record<string, unknown>): Promise<void> {
     setFailure(undefined)
@@ -58,48 +63,26 @@ export default function FriendLibraryPage() {
     }
   }
 
-  if (session.status === 'loading' || state.status === 'loading') {
-    return (
-      <Shell title="Бібліотека">
-        <p className="status status--pending">Завантажую…</p>
-      </Shell>
-    )
-  }
-
-  // Збій перевірки сесії — це НЕ «ви не залогінені»: редирект робиться лише для
-  // `guest`. Показати тут «Переадресовую…» означало б лишити людину перед
-  // написом, який ніколи не справдиться.
-  if (session.status === 'error') {
-    return (
-      <Shell title="Бібліотека">
-        <FormStatus error={new Error(session.message)} />
-        <p className="form__aside">
-          <button type="button" onClick={reloadSession}>
-            Спробувати ще раз
-          </button>{' '}
-          · <Link href="/login">Увійти</Link>
-        </p>
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell title="Бібліотека">
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  if (state.status === 'error') {
-    return (
-      <Shell title="Бібліотека">
-        <FormStatus error={new Error(state.message)} />
-        <p className="form__aside">
-          <Link href="/friends">До друзів</Link>
-        </p>
-      </Shell>
-    )
+  switch (state.status) {
+    case 'loading':
+      return (
+        <Shell title="Бібліотека">
+          <p className="status status--pending">Завантажую…</p>
+        </Shell>
+      )
+    case 'error':
+      return (
+        <Shell title="Бібліотека">
+          <FormStatus error={new Error(state.message)} />
+          <p className="form__aside">
+            <Link href="/friends">До друзів</Link>
+          </p>
+        </Shell>
+      )
+    case 'ready':
+      break
+    default:
+      return assertNever(state)
   }
 
   return (
@@ -120,21 +103,7 @@ export default function FriendLibraryPage() {
           ))}
         </ul>
       )}
-
-      <p className="form__aside">
-        <Link href="/friends">До друзів</Link> · <Link href="/loans">Позичання</Link> ·{' '}
-        <Link href="/catalog">Каталог</Link> · <Link href="/library">Моя бібліотека</Link>
-      </p>
     </Shell>
-  )
-}
-
-function Shell({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <main className="page">
-      <h1>{title}</h1>
-      {children}
-    </main>
   )
 }
 

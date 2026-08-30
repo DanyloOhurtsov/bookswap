@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   CONDITION,
   VISIBILITY,
@@ -17,12 +17,14 @@ import { AuthorLine, Chip, EditionLine } from '@/components/BookParts'
 import { HistoryEntryLine } from '@/components/HistoryEntryLine'
 import { SelectField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 import { WishlistButton } from '@/components/WishList/WishListButton'
+import { assertNever } from '../../../lib/assert-never'
 import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '../../../lib/labels'
 import { useWork } from '../../../lib/use-catalog'
 import { useWorkHistory } from '../../../lib/use-history'
-import { useSession } from '../../../lib/use-session'
 import { useWishlist } from '../../../lib/use-wishlist'
 import { validate, type FieldErrors } from '../../../lib/validation'
 
@@ -38,15 +40,18 @@ import { validate, type FieldErrors } from '../../../lib/validation'
  */
 export default function WorkPage() {
   const parameters = useParams<{ id: string }>()
+
+  return (
+    <SessionBoundary title="Твір" description="Інформація про твір.">
+      <WorkScreen workId={parameters.id} />
+    </SessionBoundary>
+  )
+}
+
+function WorkScreen({ workId }: { workId: string }) {
   const router = useRouter()
-  const { state: session, reload: reloadSession } = useSession()
-  const workId = parameters.id
   const { state, reload, canonicalWorkId } = useWork(workId)
   const wishlist = useWishlist()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
 
   /**
    * §6.3: reading a merged work answers 301 on the canonical one, and `fetch`
@@ -62,54 +67,32 @@ export default function WorkPage() {
     if (canonicalWorkId !== null) router.replace(`/works/${encodeURIComponent(canonicalWorkId)}`)
   }, [canonicalWorkId, router])
 
-  if (session.status === 'loading' || state.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Завантажую…</p>
-      </Shell>
-    )
-  }
-
-  // Збій перевірки сесії — це НЕ «ви не залогінені»: редирект робиться лише для
-  // `guest`, тож «Переадресовую…» тут ніколи б не справдилося.
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-        <p className="form__aside">
-          <button type="button" onClick={reloadSession}>
-            Спробувати ще раз
-          </button>{' '}
-          · <Link href="/login">Увійти</Link>
-        </p>
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  if (state.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(state.message)} />
-        <p className="form__aside">
-          <Link href="/catalog">До каталогу</Link>
-        </p>
-      </Shell>
-    )
+  switch (state.status) {
+    case 'loading':
+      return (
+        <Shell title="Твір" description="Інформація про твір.">
+          <p className="status status--pending">Завантажую…</p>
+        </Shell>
+      )
+    case 'error':
+      return (
+        <Shell title="Твір" description="Інформація про твір.">
+          <FormStatus error={new Error(state.message)} />
+          <p className="form__aside">
+            <Link href="/catalog">До каталогу</Link>
+          </p>
+        </Shell>
+      )
+    case 'ready':
+      break
+    default:
+      return assertNever(state)
   }
 
   const { work, authors, translations, editions } = state.detail
 
   return (
-    <main className="page">
-      <h1>{work.title}</h1>
+    <Shell title={work.title}>
       <p className="lede">
         <AuthorLine authors={authors} />
       </p>
@@ -156,13 +139,7 @@ export default function WorkPage() {
       </section>
 
       <WorkHistorySection workId={workId} />
-
-      <p className="form__aside">
-        <Link href={`/catalog/new?workId=${work.id}`}>Додати переклад або видання</Link> ·{' '}
-        <Link href="/catalog">До каталогу</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
-        <Link href="/wishlist">Вішлист</Link>
-      </p>
-    </main>
+    </Shell>
   )
 }
 
@@ -177,52 +154,44 @@ export default function WorkPage() {
 function WorkHistorySection({ workId }: { workId: string }) {
   const { state } = useWorkHistory(workId)
 
-  if (state.status === 'loading') {
-    return (
-      <section className="friends-section">
-        <h2>Хто з друзів це читав</h2>
-        <p className="status status--pending">Завантажую…</p>
-      </section>
-    )
+  switch (state.status) {
+    case 'loading':
+      return (
+        <section className="friends-section">
+          <h2>Хто з друзів це читав</h2>
+          <p className="status status--pending">Завантажую…</p>
+        </section>
+      )
+    case 'error':
+      return (
+        <section className="friends-section">
+          <h2>Хто з друзів це читав</h2>
+          <FormStatus error={new Error(state.message)} />
+        </section>
+      )
+    case 'ready':
+      return (
+        <section className="friends-section">
+          <h2>Хто з друзів це читав</h2>
+          {state.data.entries.length === 0 ? (
+            <p className="empty">Серед ваших друзів цю книжку ще ніхто не позичав.</p>
+          ) : (
+            <ul className="copies">
+              {state.data.entries.map((item, index) => (
+                <HistoryEntryLine
+                  // Анонімний запис не має `loanId` навмисно (§6.6): за ним два зрізи
+                  // чужої історії склеїлися б в одну людину.
+                  key={item.entry.names ? item.entry.loanId : `anon-${String(index)}`}
+                  entry={item.entry}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      )
+    default:
+      return assertNever(state)
   }
-
-  if (state.status === 'error') {
-    return (
-      <section className="friends-section">
-        <h2>Хто з друзів це читав</h2>
-        <FormStatus error={new Error(state.message)} />
-      </section>
-    )
-  }
-
-  return (
-    <section className="friends-section">
-      <h2>Хто з друзів це читав</h2>
-      {state.data.entries.length === 0 ? (
-        <p className="empty">Серед ваших друзів цю книжку ще ніхто не позичав.</p>
-      ) : (
-        <ul className="copies">
-          {state.data.entries.map((item, index) => (
-            <HistoryEntryLine
-              // Анонімний запис не має `loanId` навмисно (§6.6): за ним два зрізи
-              // чужої історії склеїлися б в одну людину.
-              key={item.entry.names ? item.entry.loanId : `anon-${String(index)}`}
-              entry={item.entry}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
-
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <main className="page">
-      <h1>Твір</h1>
-      {children}
-    </main>
-  )
 }
 
 /**

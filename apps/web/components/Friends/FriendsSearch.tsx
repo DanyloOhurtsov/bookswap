@@ -2,8 +2,7 @@ import type { FormEvent } from 'react'
 import type { FriendRelation, FriendRequest, UserSearchResult } from '@bookswap/shared'
 import { SearchIcon, UserPlusIcon } from 'lucide-react'
 import type { FieldErrors } from '@/app/lib/validation'
-import { UserAvatar } from '@/components/Friends/UserAvatar'
-import { Button } from '@/components/ui/button'
+import { UserAvatar, Button } from '@/components/index'
 
 export type SearchMode = 'name' | 'email'
 

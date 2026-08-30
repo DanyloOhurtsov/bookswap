@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState, type ReactNode } from 'react'
+import { ReactNode, Suspense, useState } from 'react'
 import {
   LOAN_ROLES,
   LOAN_STATUS,
@@ -15,10 +15,18 @@ import { AuthorLine, EditionLine } from '@/components/BookParts'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { SelectField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { EmptyState, LoadingState } from '@/components/PageState'
+import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CONDITION_LABELS, LOAN_ACTION_LABELS, LOAN_STATUS_LABELS, formatDate } from '../../lib/labels'
+import {
+  CONDITION_LABELS,
+  LOAN_ACTION_LABELS,
+  LOAN_STATUS_LABELS,
+  formatDate,
+} from '../../lib/labels'
 import { counterpartOf, roleOf, useLoan, useLoans } from '../../lib/use-loans'
-import { useSession } from '../../lib/use-session'
 
 /**
  * §5 і §8: усі позичання людини, з обох боків.
@@ -29,65 +37,27 @@ import { useSession } from '../../lib/use-session'
  * кнопки лише не пропонують того, що гарантовано дасть 409.
  */
 export default function LoansPage() {
-  const router = useRouter()
-  const { state: session } = useSession()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
-    )
-  }
-
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  // `useSearchParams` вимагає межі Suspense: без неї Next не вміє пререндерити
-  // сторінку, яка залежить від рядка запиту.
   return (
-    <Suspense
-      fallback={
-        <Shell>
-          <p className="status status--pending">Завантажую…</p>
-        </Shell>
-      }
-    >
-      <LoansScreen user={session.user} />
-    </Suspense>
+    <SessionBoundary title="Позичання">
+      {({ user }) => (
+        <Suspense
+          fallback={
+            <Shell title="Позичання">
+              <p className="status status--pending">Завантажую…</p>
+            </Shell>
+          }
+        >
+          <LoansScreen user={user} />
+        </Suspense>
+      )}
+    </SessionBoundary>
   )
 }
 
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <main className="page">
-      <h1>Позичання</h1>
-      {children}
-    </main>
-  )
-}
-
-const ROLE_LABELS: Readonly<Record<LoanRole, string>> = {
-  owner: 'Мої книжки',
-  borrower: 'Я прошу',
-}
+const LOAN_ROLE_OPTIONS: readonly SegmentedOption<LoanRole>[] = [
+  { value: 'owner', label: 'Мої книжки' },
+  { value: 'borrower', label: 'Я прошу' },
+]
 
 /**
  * Спільна механіка дій над лоаном.
@@ -187,23 +157,14 @@ function LoanListView({ user }: { user: Me }) {
   const actions = useLoanActions(reload)
 
   return (
-    <Shell>
-      <nav className="actions" aria-label="Бік позичання">
-        {LOAN_ROLES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={role === value ? undefined : 'button--ghost'}
-            aria-pressed={role === value}
-            aria-current={role === value ? 'page' : undefined}
-            onClick={() => {
-              selectRole(value)
-            }}
-          >
-            {ROLE_LABELS[value]}
-          </button>
-        ))}
-      </nav>
+    <Shell title="Позичання">
+      <SegmentedControl
+        className="mb-8"
+        label="Бік позичання"
+        value={role}
+        options={LOAN_ROLE_OPTIONS}
+        onValueChange={selectRole}
+      />
 
       <form
         className="search"
@@ -231,18 +192,18 @@ function LoanListView({ user }: { user: Me }) {
 
       <FormStatus error={actions.failure} />
 
-      {state.status === 'loading' && <p className="status status--pending">Завантажую…</p>}
+      {state.status === 'loading' && <LoadingState>Завантажую позичання…</LoadingState>}
       {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
 
       {state.status === 'ready' && state.data.loans.length === 0 && (
-        <p className="empty">
+        <EmptyState title="Позичань поки немає">
           {role === 'owner'
             ? 'Вашими книжками поки ніхто не цікавився.'
             : 'Ви поки нічого не просили. Загляньте в бібліотеку друга.'}
-        </p>
+        </EmptyState>
       )}
 
-      {state.status === 'ready' && (
+      {state.status === 'ready' && state.data.loans.length > 0 && (
         <ul className="books">
           {state.data.loans.map((loan) => (
             <LoanCard
@@ -258,7 +219,6 @@ function LoanListView({ user }: { user: Me }) {
       )}
 
       <LoanDialog actions={actions} />
-      <LoanFooter />
     </Shell>
   )
 }
@@ -284,7 +244,7 @@ function SingleLoanView({ user, loanId }: { user: Me; loanId: string }) {
     state.status === 'ready' ? roleOf(state.data.loan, user.id) : null
 
   return (
-    <Shell>
+    <Shell title="Позичання">
       <p className="form__aside">
         {backRole === null ? (
           'Одне позичання.'
@@ -318,7 +278,6 @@ function SingleLoanView({ user, loanId }: { user: Me; loanId: string }) {
       )}
 
       <LoanDialog actions={actions} />
-      <LoanFooter />
     </Shell>
   )
 }
@@ -340,16 +299,6 @@ function LoanDialog({ actions }: { actions: LoanActions }) {
         setConfirmation(undefined)
       }}
     />
-  )
-}
-
-function LoanFooter() {
-  return (
-    <p className="form__aside">
-      <Link href="/library">Моя бібліотека</Link> · <Link href="/history">Історія</Link> ·{' '}
-      <Link href="/notifications">Сповіщення</Link> · <Link href="/friends">Друзі</Link> ·{' '}
-      <Link href="/">На головну</Link>
-    </p>
   )
 }
 

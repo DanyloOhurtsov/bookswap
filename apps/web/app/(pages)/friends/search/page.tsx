@@ -1,9 +1,5 @@
-import React from 'react'
+import { redirect } from 'next/navigation'
 
-const FriendsSearch = () => {
-  return (
-    <div>FriendsSearch</div>
-  )
+export default function FriendsSearchPage() {
+  redirect('/friends#friend-search-title')
 }
-
-export default FriendsSearch

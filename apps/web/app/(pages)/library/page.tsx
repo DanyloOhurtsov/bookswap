@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   CONDITION,
   COPY_STATUS,
@@ -22,10 +21,18 @@ import { AuthorLine, EditionLine } from '@/components/BookParts'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { SelectField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { EmptyState, LoadingState } from '@/components/PageState'
+import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CONDITION_LABELS, COPY_STATUS_LABELS, VISIBILITY_LABELS, formatDate } from '../../lib/labels'
+import {
+  CONDITION_LABELS,
+  COPY_STATUS_LABELS,
+  VISIBILITY_LABELS,
+  formatDate,
+} from '../../lib/labels'
 import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../../lib/use-library'
-import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'
 
 /**
@@ -36,86 +43,36 @@ import { validate, type FieldErrors } from '../../lib/validation'
  * «скільки» (§3). Тому редагувати й видаляти можна кожен окремо.
  */
 export default function LibraryPage() {
-  const router = useRouter()
-  const { state: session } = useSession()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
-    )
-  }
-
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  return <LibraryScreen />
-}
-
-function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="page">
-      <h1>Моя бібліотека</h1>
-      {children}
-    </main>
+    <SessionBoundary title="Моя бібліотека">
+      <LibraryScreen />
+    </SessionBoundary>
   )
 }
 
-const VIEW_LABELS: Readonly<Record<LibraryView, string>> = {
-  own: 'Усі мої',
-  out: 'Мої не вдома',
-  borrowed: 'Чужі в мене',
-}
+const LIBRARY_VIEW_OPTIONS: readonly SegmentedOption<LibraryView>[] = [
+  { value: 'own', label: 'Усі мої' },
+  { value: 'out', label: 'Мої не вдома' },
+  { value: 'borrowed', label: 'Чужі в мене' },
+]
 
 function LibraryScreen() {
   const [view, setView] = useState<LibraryView>('own')
 
   return (
-    <Shell>
-      <nav className="actions" aria-label="Вигляд бібліотеки">
-        {(['own', 'out', 'borrowed'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={view === value ? undefined : 'button--ghost'}
-            aria-pressed={view === value}
-            onClick={() => {
-              setView(value)
-            }}
-          >
-            {VIEW_LABELS[value]}
-          </button>
-        ))}
-      </nav>
+    <Shell title="Моя бібліотека">
+      <SegmentedControl
+        className="mb-8"
+        label="Вигляд бібліотеки"
+        value={view}
+        options={LIBRARY_VIEW_OPTIONS}
+        onValueChange={setView}
+      />
 
       {/* Два різні в'ю — два різні компоненти з власними хуками. «Чужі в мене»
           віддає інший тип примірника й не має жодної мутації, тож спільний стан
           із фільтрами й `busyKey` їм не потрібен. */}
       {view === 'borrowed' ? <BorrowedView /> : <OwnView view={view} />}
-
-      <p className="form__aside">
-        <Link href="/catalog">Додати книжку</Link> · <Link href="/loans">Позичання</Link> ·{' '}
-        <Link href="/history">Історія</Link> · <Link href="/friends">Друзі</Link> ·{' '}
-        <Link href="/">На головну</Link>
-      </p>
     </Shell>
   )
 }
@@ -125,14 +82,14 @@ function BorrowedView() {
 
   return (
     <>
-      {state.status === 'loading' && <p className="status status--pending">Завантажую полицю…</p>}
+      {state.status === 'loading' && <LoadingState>Завантажую полицю…</LoadingState>}
       {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
 
       {state.status === 'ready' && state.data.groups.length === 0 && (
-        <p className="empty">{emptyMessage('borrowed')}</p>
+        <EmptyState title="На цій полиці поки порожньо">{emptyMessage('borrowed')}</EmptyState>
       )}
 
-      {state.status === 'ready' && (
+      {state.status === 'ready' && state.data.groups.length > 0 && (
         <ul className="books">
           {state.data.groups.map((group) => (
             <BorrowedGroupCard key={group.edition.id} group={group} />
@@ -243,14 +200,14 @@ function OwnView({ view }: { view: 'own' | 'out' }) {
 
       <FormStatus error={failure} />
 
-      {state.status === 'loading' && <p className="status status--pending">Завантажую полицю…</p>}
+      {state.status === 'loading' && <LoadingState>Завантажую полицю…</LoadingState>}
       {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
 
       {state.status === 'ready' && state.data.groups.length === 0 && (
-        <p className="empty">{emptyMessage(view)}</p>
+        <EmptyState title="На цій полиці поки порожньо">{emptyMessage(view)}</EmptyState>
       )}
 
-      {state.status === 'ready' && (
+      {state.status === 'ready' && state.data.groups.length > 0 && (
         <ul className="books">
           {state.data.groups.map((group) => (
             <OwnGroupCard

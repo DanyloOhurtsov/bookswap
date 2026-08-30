@@ -358,6 +358,28 @@ describe('гілка «наявне Work»', () => {
   })
 })
 
+describe('вхід зі сторінки твору через workId', () => {
+  it('показує наявні переклади твору замість пропозиції створити дублікат', async () => {
+    const existingTranslation = translation({
+      id: 'translation-existing',
+      translator: 'Наявний Перекладач',
+      lang: 'pl',
+    })
+
+    searchParams = new URLSearchParams({ workId: 'work-1' })
+    routeApiRequest({
+      '/works/work-1': () => candidate({ translations: [existingTranslation] }),
+    })
+
+    render(<NewBookPage />)
+
+    expect(screen.getByText('Підготовка видання')).toBeInTheDocument()
+    expect(await screen.findByText('Переклад')).toBeInTheDocument()
+    expect(screen.getByText(/Наявний Перекладач/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Використати цей переклад' })).toBeInTheDocument()
+  })
+})
+
 describe('гілка «наявне Edition» — lookup не впливає', () => {
   it('lookup успішний, але гілка «наявне Edition» все одно створює лише Copy', async () => {
     routeApiRequest({

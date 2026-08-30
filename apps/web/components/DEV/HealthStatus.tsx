@@ -11,16 +11,8 @@ import {
 type State =
   { kind: 'loading' } | { kind: 'ok'; data: HealthResponse } | { kind: 'error'; message: string }
 
-// Інлайниться на етапі складання; єдина змінна, яку web отримує з кореневого .env.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
-/**
- * Клієнтський компонент навмисно.
- *
- * Запит до API виконується в рантаймі браузера, тож `next build` ніколи не
- * звертається до бекенду — складання проходить із зупиненим API. Відповідь
- * розбирається схемами з `@bookswap/shared`, тими самими, якими API її формує.
- */
 export function HealthStatus() {
   const [state, setState] = useState<State>({ kind: 'loading' })
 

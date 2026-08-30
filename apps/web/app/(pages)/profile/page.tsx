@@ -1,8 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   PROFILE_LIMITS,
   VISIBILITY,
@@ -14,8 +12,9 @@ import {
 } from '@bookswap/shared'
 import { SelectField, TextAreaField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'
 
 const VISIBILITY_LABELS: Record<Visibility, string> = {
@@ -25,46 +24,14 @@ const VISIBILITY_LABELS: Record<Visibility, string> = {
 }
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const { state, setUser } = useSession()
-
-  // Захист сторінки: гостя відправляємо на логін, щойно це стало відомо.
-  useEffect(() => {
-    if (state.status === 'guest') router.replace('/login')
-  }, [state.status, router])
-
-  if (state.status === 'loading') {
-    return (
-      <main className="page">
-        <h1>Профіль</h1>
-        <p className="status status--pending">Завантажую профіль…</p>
-      </main>
-    )
-  }
-
-  if (state.status === 'error') {
-    return (
-      <main className="page">
-        <h1>Профіль</h1>
-        <FormStatus error={new Error(state.message)} />
-      </main>
-    )
-  }
-
-  if (state.status === 'guest') {
-    return (
-      <main className="page">
-        <h1>Профіль</h1>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </main>
-    )
-  }
-
-  return <ProfileForm user={state.user} onUpdated={setUser} />
+  return (
+    <SessionBoundary title="Профіль" loadingMessage="Завантажую профіль…">
+      {({ user, setUser }) => <ProfileForm user={user} onUpdated={setUser} />}
+    </SessionBoundary>
+  )
 }
 
 function ProfileForm({ user, onUpdated }: { user: Me; onUpdated: (user: Me) => void }) {
-  const router = useRouter()
   const [fields, setFields] = useState({
     displayName: user.displayName,
     avatarUrl: user.avatarUrl ?? '',
@@ -132,19 +99,8 @@ function ProfileForm({ user, onUpdated }: { user: Me; onUpdated: (user: Me) => v
     }
   }
 
-  async function logout(): Promise<void> {
-    try {
-      await apiRequest('/auth/logout', { method: 'POST' })
-    } finally {
-      router.replace('/login')
-    }
-  }
-
   return (
-    <main className="page page--narrow">
-      <h1>Профіль</h1>
-      <p className="lede">{user.email}</p>
-
+    <Shell title="Профіль" description={user.email}>
       {!user.emailVerified && (
         <div className="alert alert--warn" role="status">
           <p>Адресу ще не підтверджено.</p>
@@ -241,17 +197,6 @@ function ProfileForm({ user, onUpdated }: { user: Me; onUpdated: (user: Me) => v
           {pending ? 'Зберігаю…' : 'Зберегти'}
         </button>
       </form>
-
-      <p className="form__aside">
-        {/* §6.1 називає підключення Telegram і налаштування сповіщень частиною
-            профілю; сама сторінка окрема, бо матриця §7.6 більша за решту форми. */}
-        <Link href="/notifications/settings">Сповіщення й Telegram</Link> ·{' '}
-        <Link href="/friends">Друзі</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
-        <button type="button" className="button--link" onClick={() => void logout()}>
-          Вийти
-        </button>{' '}
-        · <Link href="/">На головну</Link>
-      </p>
-    </main>
+    </Shell>
   )
 }

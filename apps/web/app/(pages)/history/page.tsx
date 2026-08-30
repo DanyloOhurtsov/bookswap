@@ -1,14 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { MyHistoryEntry } from '@bookswap/shared'
 import { AuthorLine, EditionLine } from '@/components/BookParts'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { useSession } from '@/app/lib/use-session'
 import { useMyHistory } from '@/app/lib/use-history'
 import { HistoryEntryLine } from '@/components/HistoryEntryLine'
+import { EmptyState, LoadingState } from '@/components/PageState'
+import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
+
+const HISTORY_DESCRIPTION = 'Книжки, які ви брали або позичали іншим.'
 
 /**
  * §6.6, «Моя історія»: що я брав і що в мене брали.
@@ -17,99 +21,49 @@ import { HistoryEntryLine } from '@/components/HistoryEntryLine'
  * стороння людина, тож §6.6 до нього не застосовується.
  */
 export default function HistoryPage() {
-  const router = useRouter()
-  const { state: session } = useSession()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
-    )
-  }
-
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  return <HistoryScreen />
-}
-
-function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="page">
-      <h1>Моя історія</h1>
-      {children}
-    </main>
+    <SessionBoundary title="Моя історія" description={HISTORY_DESCRIPTION}>
+      <HistoryScreen />
+    </SessionBoundary>
   )
 }
 
 type View = 'borrowed' | 'lent'
 
-const VIEW_LABELS: Readonly<Record<View, string>> = {
-  borrowed: 'Що я брав',
-  lent: 'Що в мене брали',
-}
+const HISTORY_VIEW_OPTIONS: readonly SegmentedOption<View>[] = [
+  { value: 'borrowed', label: 'Що я брав' },
+  { value: 'lent', label: 'Що в мене брали' },
+]
 
 function HistoryScreen() {
   const [view, setView] = useState<View>('borrowed')
   const { state } = useMyHistory()
 
   return (
-    <Shell>
-      <nav className="actions" aria-label="Вигляд історії">
-        {(['borrowed', 'lent'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={view === value ? undefined : 'button--ghost'}
-            aria-pressed={view === value}
-            onClick={() => {
-              setView(value)
-            }}
-          >
-            {VIEW_LABELS[value]}
-          </button>
-        ))}
-      </nav>
+    <Shell title="Моя історія" description={HISTORY_DESCRIPTION}>
+      <SegmentedControl
+        className="mb-8"
+        label="Вигляд історії"
+        value={view}
+        options={HISTORY_VIEW_OPTIONS}
+        onValueChange={setView}
+      />
 
-      {state.status === 'loading' && <p className="status status--pending">Завантажую…</p>}
+      {state.status === 'loading' && <LoadingState>Завантажую історію…</LoadingState>}
       {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
 
-      {state.status === 'ready' && state.data[view].length === 0 && (
-        <p className="empty">
-          {view === 'borrowed' ? 'Ви поки нічого не брали.' : 'У вас поки нічого не брали.'}
-        </p>
-      )}
-
-      {state.status === 'ready' && (
-        <ul className="books">
-          {state.data[view].map((item) => (
-            <HistoryCard key={item.entry.loanId} item={item} />
-          ))}
-        </ul>
-      )}
-
-      <p className="form__aside">
-        <Link href="/loans">Позичання</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
-        <Link href="/notifications">Сповіщення</Link> · <Link href="/">На головну</Link>
-      </p>
+      {state.status === 'ready' &&
+        (state.data[view].length === 0 ? (
+          <EmptyState title="Історія поки порожня">
+            {view === 'borrowed' ? 'Ви ще нічого не брали.' : 'У вас ще нічого не брали.'}
+          </EmptyState>
+        ) : (
+          <ul className="books">
+            {state.data[view].map((item) => (
+              <HistoryCard key={item.entry.loanId} item={item} />
+            ))}
+          </ul>
+        ))}
     </Shell>
   )
 }

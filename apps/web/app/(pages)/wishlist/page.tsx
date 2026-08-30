@@ -1,11 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, type ReactNode } from 'react'
 import { AuthorLine } from '@/components/BookParts'
 import { FormStatus } from '@/components/Form/FormStatus'
-import { useSession } from '../../lib/use-session'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
+import { assertNever } from '../../lib/assert-never'
 import { useWishlist } from '../../lib/use-wishlist'
 
 /**
@@ -14,56 +14,38 @@ import { useWishlist } from '../../lib/use-wishlist'
  * тут лише малювання.
  */
 export default function WishlistPage() {
-  const router = useRouter()
-  const { state: session } = useSession()
+  return (
+    <SessionBoundary title="Вішлист" description="Список творів, які ви хочете прочитати.">
+      <WishlistScreen />
+    </SessionBoundary>
+  )
+}
+
+function WishlistScreen() {
   const wishlist = useWishlist()
 
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
-    )
-  }
-
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
   if (wishlist.items === undefined) {
-    if (wishlist.state.status === 'error') {
-      return (
-        <Shell>
-          <FormStatus error={new Error(wishlist.state.message)} />
-        </Shell>
-      )
+    switch (wishlist.state.status) {
+      case 'error':
+        return (
+          <Shell title="Вішлист" description="Список творів, які ви хочете прочитати.">
+            <FormStatus error={new Error(wishlist.state.message)} />
+          </Shell>
+        )
+      case 'loading':
+      case 'ready':
+        return (
+          <Shell title="Вішлист" description="Список творів, які ви хочете прочитати.">
+            <p className="status status--pending">Завантажую…</p>
+          </Shell>
+        )
+      default:
+        return assertNever(wishlist.state)
     }
-
-    return (
-      <Shell>
-        <p className="status status--pending">Завантажую…</p>
-      </Shell>
-    )
   }
 
   return (
-    <Shell>
+    <Shell title="Вішлист" description="Список творів, які ви хочете прочитати.">
       {wishlist.refreshing && <p className="status status--pending">Оновлюю…</p>}
 
       {wishlist.backgroundErrorMessage !== undefined && (
@@ -101,20 +83,6 @@ export default function WishlistPage() {
           ))}
         </ul>
       )}
-
-      <p className="form__aside">
-        <Link href="/catalog">Каталог</Link> · <Link href="/library">Моя бібліотека</Link> ·{' '}
-        <Link href="/">На головну</Link>
-      </p>
     </Shell>
-  )
-}
-
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <main className="page">
-      <h1>Вішлист</h1>
-      {children}
-    </main>
   )
 }

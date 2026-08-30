@@ -1,8 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   DIGEST_NOTIFICATION_TYPE,
   NOTIFICATION_TYPE,
@@ -15,6 +13,7 @@ import {
 } from '@bookswap/shared'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { FormStatus } from '@/components/Form/FormStatus'
+import { assertNever } from '../../../lib/assert-never'
 import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
 import { CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from '../../../lib/labels'
 import {
@@ -30,7 +29,8 @@ import {
 } from '../../../lib/notification-preferences'
 import { displayDecision } from '../../../lib/resource-state'
 import { useNotificationPreferences } from '../../../lib/use-notification-preferences'
-import { useSession } from '../../../lib/use-session'
+import { SessionBoundary } from '@/components/SessionBoundary'
+import { Shell } from '@/components/Shell'
 
 /**
  * §7.6 і §7.4: матриця «тип події × канал», стан каналів і прив'язка Telegram.
@@ -40,50 +40,13 @@ import { useSession } from '../../../lib/use-session'
  * `app/lib`, і злиття дефолтів із збереженим станом мусить бути перевіреним.
  */
 export default function NotificationSettingsPage() {
-  const router = useRouter()
-  const { state: session } = useSession()
-
-  useEffect(() => {
-    if (session.status === 'guest') router.replace('/login')
-  }, [session.status, router])
-
-  if (session.status === 'loading') {
-    return (
-      <Shell>
-        <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
-    )
-  }
-
-  if (session.status === 'error') {
-    return (
-      <Shell>
-        <FormStatus error={new Error(session.message)} />
-      </Shell>
-    )
-  }
-
-  if (session.status !== 'authenticated') {
-    return (
-      <Shell>
-        <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
-    )
-  }
-
-  return <SettingsScreen />
-}
-
-function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="page">
-      <h1>Налаштування сповіщень</h1>
-      {children}
-      <p className="form__aside">
-        <Link href="/notifications">Сповіщення</Link> · <Link href="/profile">Профіль</Link> ·{' '}
-        <Link href="/">На головну</Link>
-      </p>
-    </main>
+    <SessionBoundary
+      title="Налаштування сповіщень"
+      description="Налаштуйте свої сповіщення про події."
+    >
+      <SettingsScreen />
+    </SessionBoundary>
   )
 }
 
@@ -119,7 +82,16 @@ function SettingsScreen() {
   // «входи змінилися, онови похідне», яким уже користується `use-resource.ts`
   // для `tracked`: React перерендерить одразу, нічого не закомітивши, а
   // `useEffect` тут додав би зайвий кадр зі старими даними на екрані.
-  if (state.status === 'ready' && state.data !== lastData) setLastData(state.data)
+  switch (state.status) {
+    case 'ready':
+      if (state.data !== lastData) setLastData(state.data)
+      break
+    case 'loading':
+    case 'error':
+      break
+    default:
+      assertNever(state)
+  }
 
   // Усе рішення «що малювати» — в одній чистій, перевіреній функції
   // (`resource-state.spec.ts`): яка комбінація status/lastData дає форму,
@@ -130,42 +102,33 @@ function SettingsScreen() {
   // того, як щось було показано. Тільки тут виправдане повноекранне «нема
   // форми» — у решті випадків форма лишається на екрані.
   if (data === undefined) {
-    if (state.status === 'error') {
-      return (
-        <Shell>
-          <FormStatus error={new Error(state.message)} />
-        </Shell>
-      )
+    switch (state.status) {
+      case 'error':
+        return (
+          <Shell title="Налаштування сповіщень" description="Налаштуйте свої сповіщення про події.">
+            <FormStatus error={new Error(state.message)} />
+          </Shell>
+        )
+      case 'loading':
+      case 'ready':
+        return (
+          <Shell title="Налаштування сповіщень" description="Налаштуйте свої сповіщення про події.">
+            <p className="status status--pending">Завантажую налаштування…</p>
+          </Shell>
+        )
+      default:
+        return assertNever(state)
     }
-
-    return (
-      <Shell>
-        <p className="status status--pending">Завантажую налаштування…</p>
-      </Shell>
-    )
   }
 
   return (
-    <Shell>
-      {/* Дані вже є (можливо, застарілі на секунду фонового reload) — форма
-          лишається змонтованою; окремий, ненав'язливий індикатор нижче каже,
-          що йде оновлення, не забираючи форму з-під рук людини. */}
+    <Shell title="Налаштування сповіщень" description="Налаштуйте свої сповіщення про події.">
       {refreshing && <p className="status status--pending">Оновлюю…</p>}
 
-      {/* Дефект: фонова помилка (5xx/мережа під час «Я натиснув Start —
-          перевірити») раніше не показувалася ВЗАГАЛІ, поки лишалися старі
-          дані, — людина бачила стару форму й жодного натяку, що перевірка не
-          пройшла. Ненавʼязливий, а не сторінка-заміна: форма й `deepLink`
-          лишаються на місці, банер лише повідомляє. Зникає сам собою на
-          наступному вдалому reload() — `state.status` тоді стає `'ready'`,
-          і `backgroundErrorMessage` просто перестає обчислюватися, без
-          окремого стану чи ефекту. */}
       {backgroundErrorMessage !== undefined && (
         <FormStatus error={new Error(`Не вдалося оновити: ${backgroundErrorMessage}`)} />
       )}
 
-      {/* `key` перемонтовує форму після зміни стану Telegram: інакше локальна
-          матриця пережила б підключення й показувала б стару колонку. */}
       <SettingsForm
         key={data.channels.telegram.connected ? 'linked' : 'unlinked'}
         data={data}

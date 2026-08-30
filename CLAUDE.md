@@ -1,3 +1,24 @@
+## Project
+pnpm + Turbo monorepo: apps/api (NestJS), apps/web (Next.js 16.3, App Router,
+Turbopack), packages/shared (types + zod schemas).
+Authentication — cookies; apps/web accesses apps/api via NEXT_PUBLIC_API_URL
+with credentials: ‘include’.
+
+## Standard
+docs/CONVENTIONS.md — read before making any structural changes.
+
+## Current refactoring of apps/web
+Audit: docs/audits/2026-08-30-web.md. Proceed step by step:
+1. Remove the global barrel (done / in progress)
+2. Enable ESLint for web
+3. Pilot server-side fetching
+4. Pages → features/, remove ‘use client’ from page.tsx
+
+## Limitations
+- verbatimModuleSyntax and consistent-type-imports — ONLY for web and shared.
+  In apps/api, they break Nest DI (design:paramtypes).
+- One step = one PR. Do not mix refactoring with behavior changes.
+
 # BookSwap
 
 Peer-to-peer lending of physical books between friends. pnpm workspaces + Turbo monorepo:

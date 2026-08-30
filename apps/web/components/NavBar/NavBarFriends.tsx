@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { ArrowLeftIcon, SearchIcon } from 'lucide-react'
 import { useCallback, useState, type FormEvent } from 'react'
+import { IoPeopleOutline, IoPersonAdd } from 'react-icons/io5'
 import {
   friendshipStateResponseSchema,
   userSearchRequestSchema,
@@ -10,8 +12,6 @@ import {
   type PublicUser,
   type UserSearchResult,
 } from '@bookswap/shared'
-import { ArrowLeftIcon, SearchIcon } from 'lucide-react'
-import { IoPeopleOutline, IoPersonAdd } from 'react-icons/io5'
 import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import { useFriends } from '@/app/lib/use-friends'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useState, type FormEvent } from 'react'
 import {
   friendshipStateResponseSchema,
@@ -14,11 +13,14 @@ import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import { assertNever } from '@/app/lib/assert-never'
 import { useFriends } from '@/app/lib/use-friends'
 import { validate, type FieldErrors } from '@/app/lib/validation'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { FriendsList } from '@/components/Friends/FriendsList'
-import { FriendsSearch, type SearchMode } from '@/components/Friends/FriendsSearch'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Skeleton,
+  Button,
+  ConfirmDialog,
+  FriendsSearch,
+  type SearchMode,
+  FriendsList,
+} from '@/components/index'
 
 interface SearchQuery {
   mode: SearchMode
@@ -207,18 +209,6 @@ function FriendsPageContent() {
           onUnblock={(userId) => void removeLink(userId)}
         />
       </div>
-
-      <nav className="flex flex-wrap gap-x-4 gap-y-2 border-t pt-5 text-sm text-muted-foreground">
-        <Link href="/profile" className="hover:text-foreground">
-          Профіль
-        </Link>
-        <Link href="/library" className="hover:text-foreground">
-          Моя бібліотека
-        </Link>
-        <Link href="/catalog" className="hover:text-foreground">
-          Каталог
-        </Link>
-      </nav>
 
       <ConfirmDialog
         open={confirmation !== undefined}
