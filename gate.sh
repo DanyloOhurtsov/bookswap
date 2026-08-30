@@ -8,6 +8,7 @@ set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 pnpm format:check
+pnpm exec eslint . --no-fix
 pnpm turbo run lint typecheck --force
 pnpm turbo run test build --force
 # Deliberately not chained with `&&`: under `set -e`, a failure in any command
@@ -18,7 +19,6 @@ pnpm turbo run test build --force
 # exemption: each one's failure is the *whole* statement's failure.
 pnpm db:up
 pnpm db:deploy
-pnpm db:seed
 pnpm db:seed
 pnpm test:db
 

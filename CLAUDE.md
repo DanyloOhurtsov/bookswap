@@ -1,21 +1,26 @@
 ## Project
+
 pnpm + Turbo monorepo: apps/api (NestJS), apps/web (Next.js 16.3, App Router,
 Turbopack), packages/shared (types + zod schemas).
 Authentication — cookies; apps/web accesses apps/api via NEXT_PUBLIC_API_URL
 with credentials: ‘include’.
 
 ## Standard
+
 docs/CONVENTIONS.md — read before making any structural changes.
 
 ## Current refactoring of apps/web
+
 Audit: docs/audits/2026-08-30-web.md. Proceed step by step:
+
 1. Remove the global barrel (done / in progress)
 2. Enable ESLint for web
 3. Pilot server-side fetching
 4. Pages → features/, remove ‘use client’ from page.tsx
 
 ## Limitations
-- verbatimModuleSyntax and consistent-type-imports — ONLY for web and shared.
+
+- verbatimModuleSyntax and consistent-type-imports — ONLY for web.
   In apps/api, they break Nest DI (design:paramtypes).
 - One step = one PR. Do not mix refactoring with behavior changes.
 
@@ -79,7 +84,9 @@ Do not introduce Redis, JWT, GraphQL, or microservices.
 - Never run `commit`, `push`, `merge`, `rebase`, or `stash`. I do those.
 - Never modify `docs/specification.md`.
 - Implement only the current sub-stage from `docs/plan/`. Don't start the next one.
-- Verify with `./gate.sh`.
+- Verify with `./gate.sh` in the monorepo root. It resolves its own path, so it
+  works from any cwd, but you must invoke it as `<repo-root>/gate.sh` — not `./gate.sh`
+  from inside a package.
 
 ## Escalation
 
