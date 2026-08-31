@@ -28,11 +28,32 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "verbatimModuleSyntax": true,           // import type обов'язковий для типів
     "isolatedModules": true
   }
 }
 ```
+
+**`verbatimModuleSyntax` — рішення build target конкретного застосунку, не базового конфіга.**
+Правило залежить від того, як модулі виконуються в рантаймі:
+
+- `apps/web` (ESM, бандлиться Turbopack) — `verbatimModuleSyntax: true` і
+  `@typescript-eslint/consistent-type-imports: error` увімкнені в `apps/web/tsconfig.json`.
+- `apps/api` (NestJS, CommonJS-вивід, `emitDecoratorMetadata`) — обидва вимкнені. Nest DI читає
+  типи параметрів конструктора через `design:paramtypes`, а `verbatimModuleSyntax` прибирає
+  type-only імпорти з вихідного JS ще до того, як `emitDecoratorMetadata` встигає їх побачити —
+  впорскування ламається мовчки, без помилки типів.
+
+Добре (`apps/api`, `import type` не обов'язковий):
+```ts
+import { Injectable } from '@nestjs/common'
+import { LoansRepository } from './loans.repository'   // клас, потрібен для DI-метаданих
+```
+
+Погано (форсити `verbatimModuleSyntax: true` через `tsconfig.base.json` на весь монорепо —
+мовчки ламає DI в `apps/api`, поки хтось не зіткнеться в рантаймі).
+
+`packages/shared` не залежить від жодного рантайму (§10) — вибір лишається за застосунком, який
+його імпортує; сам пакет пише код, сумісний з обома режимами (явний `import type` для типів).
 
 **`any` заборонений.** Якщо тип справді невідомий — `unknown` + звуження через zod або type guard.
 `as` дозволений тільки в двох випадках: `as const` і звуження після runtime-перевірки. Будь-який
@@ -50,7 +71,7 @@
 | Prettier | форматування — жодних дискусій про стиль у PR |
 | `knip` | мертвий код, невикористані експорти й залежності |
 | `lint-staged` + `husky` | нічого не потрапляє в комміт непроходженим |
-| `vitest` (web) / `jest` (api) | тести |
+| test runner (зараз `jest` в обох застосунках) | тести — вимоги розділу 12 runner-agnostic, конкретний інструмент не є частиною правила |
 | CI: `typecheck` → `lint` → `test` → `build` | PR не мерджиться на червоному |
 
 ### 0.3 Правила, які вмикаються одразу
@@ -284,6 +305,28 @@ Enforce: `dependency-cruiser`.
 **6.2 `@Res()` заборонений** (ламає інтерцептори, серіалізацію й обробку помилок Nest).
 Статус-код — через `@HttpCode()`, помилки — через винятки.
 
+Виняток: `@Res({ passthrough: true })` дозволений винятково для transport concerns, які Nest
+не виражає декораторами, — cookies, redirect, response headers. Тілом відповіді, статус-кодом
+за замовчуванням і серіалізацією далі керує Nest як завжди; хендлер повертає значення `return`,
+а не викликає `res.send()`/`res.json()`.
+
+Добре:
+```ts
+@Get('session')
+getSession(@Res({ passthrough: true }) res: Response): SessionDto {
+  res.cookie('sid', token, { httpOnly: true })
+  return this.authService.getSession()   // серіалізацію й статус лишаємо Nest
+}
+```
+
+Погано (повне ручне керування `Response` лишається забороненим):
+```ts
+@Get('session')
+getSession(@Res() res: Response) {
+  res.status(200).json(this.authService.getSession())   // Nest більше не бачить цю відповідь
+}
+```
+
 **6.3 Кожен ендпоінт має:** DTO входу, тип виходу, guard (або явний `@Public()`),
 Swagger-декоратори (`@ApiOperation`, `@ApiResponse`), тест.
 Ендпоінт без явного рішення про авторизацію — блокер на рев'ю.
@@ -385,6 +428,10 @@ env валідується zod-ом **на старті застосунку**. 
 Магічні числа й рядки заборонені. `if (loans.length >= 5)` → `MAX_ACTIVE_LOANS`.
 
 ### 12. Тести
+
+Вимоги нижче runner-agnostic: вони про те, що покрито тестами, а не про інструмент, що їх
+запускає. Зараз обидва застосунки на `jest` (§0.2) — перехід на `vitest` чи будь-що інше
+можливий, але окремим рішенням і окремим PR (§13), а не мовчки в рамках іншої задачі.
 
 **12.1 Обов'язково покриті:** бізнес-правила домену (переходи станів, ліміти, розрахунок
 рейтингу), кожен публічний ендпоінт (e2e, happy path + 401/403 + валідація),
