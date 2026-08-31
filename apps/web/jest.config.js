@@ -12,6 +12,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   rootDir: '.',
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
   testRegex: '.*\\.spec\\.tsx?$',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',

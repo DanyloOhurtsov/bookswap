@@ -10,7 +10,8 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 pnpm format:check
 pnpm exec eslint . --no-fix
 pnpm turbo run lint typecheck --force
-pnpm turbo run test build --force
+pnpm turbo run test --force
+pnpm turbo run build --force
 # Deliberately not chained with `&&`: under `set -e`, a failure in any command
 # but the *last* one of an AND-OR list is invisible — POSIX exempts every
 # non-final member of such a list from errexit. `db:up && db:deploy && ...`
