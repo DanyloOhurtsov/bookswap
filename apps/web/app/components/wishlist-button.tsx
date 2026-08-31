@@ -29,6 +29,9 @@ export function WishlistButton({
   const member = wishlist.isMember(work.id)
   const busy = wishlist.isPending(work.id)
 
+  // `member` уже відображає ОПТИМІСТИЧНУ ціль mutation, що летить: `busy &&
+  // member` — саме той момент, коли рядок щойно з'явився в списку, тобто
+  // додається; `busy && !member` — щойно зник, тобто прибирається.
   return (
     <div className="person__actions">
       <button
@@ -41,10 +44,10 @@ export function WishlistButton({
       >
         {member
           ? busy
-            ? 'Прибираю…'
+            ? 'Додаю…'
             : 'Прибрати з вішлиста'
           : busy
-            ? 'Додаю…'
+            ? 'Прибираю…'
             : 'Додати у вішлист'}
       </button>
       <FormStatus error={wishlist.actionError} />
