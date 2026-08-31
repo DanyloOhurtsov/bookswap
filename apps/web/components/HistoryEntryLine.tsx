@@ -1,7 +1,9 @@
-'use client'
-
 import type { HistoryEntry } from '@bookswap/shared'
 import { formatDate, LOAN_STATUS_LABELS } from '@/app/lib/labels'
+
+interface HistoryEntryLineProps {
+  entry: HistoryEntry
+}
 
 /**
  * Один запис історії (§6.6).
@@ -11,7 +13,7 @@ import { formatDate, LOAN_STATUS_LABELS } from '@/app/lib/labels'
  * `false` полів `owner`/`borrower` просто не існує. Фронт нічого не приховує сам —
  * рішення ухвалив сервер за §9, а тут лише два способи це показати.
  */
-export function HistoryEntryLine({ entry }: { entry: HistoryEntry }) {
+export function HistoryEntryLine({ entry }: HistoryEntryLineProps) {
   return (
     <li className="copy">
       <span className="book__meta">

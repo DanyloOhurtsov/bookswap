@@ -1,10 +1,12 @@
-'use client'
-
 import Link from 'next/link'
 import type { Edition, Work, WorkAuthor } from '@bookswap/shared'
 import { AUTHOR_ROLE_LABELS, EDITION_FORMAT_LABELS } from '@/app/lib/labels'
 
-function AuthorLine({ authors }: { authors: WorkAuthor[] }) {
+interface AuthorLineProps {
+  authors: WorkAuthor[]
+}
+
+function AuthorLine({ authors }: AuthorLineProps) {
   if (authors.length === 0) return <span className="book__meta">Автора не вказано</span>
 
   return (
@@ -20,7 +22,12 @@ function AuthorLine({ authors }: { authors: WorkAuthor[] }) {
   )
 }
 
-function WorkTitle({ work, authors }: { work: Work; authors: WorkAuthor[] }) {
+interface WorkTitleProps {
+  work: Work
+  authors: WorkAuthor[]
+}
+
+function WorkTitle({ work, authors }: WorkTitleProps) {
   return (
     <>
       <Link className="book__title" href={`/works/${work.id}`}>
@@ -39,7 +46,11 @@ function WorkTitle({ work, authors }: { work: Work; authors: WorkAuthor[] }) {
  * оригіналу це мова твору й порожній перекладач (§4.4), і фронт цю умову не
  * повторює.
  */
-function EditionLine({ edition }: { edition: Edition }) {
+interface EditionLineProps {
+  edition: Edition
+}
+
+function EditionLine({ edition }: EditionLineProps) {
   const parts = [
     edition.publisher,
     edition.year === null ? null : String(edition.year),
@@ -62,7 +73,11 @@ function EditionLine({ edition }: { edition: Edition }) {
   )
 }
 
-function Chip({ children }: { children: string }) {
+interface ChipProps {
+  children: string
+}
+
+function Chip({ children }: ChipProps) {
   return <span className="chip">{children}</span>
 }
 

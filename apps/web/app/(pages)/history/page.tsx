@@ -1,89 +1,36 @@
-'use client'
-
-import Link from 'next/link'
-import { useState } from 'react'
-import type { MyHistoryEntry } from '@bookswap/shared'
-import { AuthorLine, EditionLine } from '@/components/BookParts'
-import { FormStatus } from '@/components/Form/FormStatus'
-import { useMyHistory } from '@/app/lib/use-history'
-import { HistoryEntryLine } from '@/components/HistoryEntryLine'
-import { EmptyState, LoadingState } from '@/components/PageState'
-import { SegmentedControl, type SegmentedOption } from '@/components/SegmentedControl'
-import { SessionBoundary } from '@/components/SessionBoundary'
+import { myHistoryResponseSchema } from '@bookswap/shared'
 import { Shell } from '@/components/Shell'
+import {
+  HISTORY_SHELL,
+  HistoryList,
+  HistoryViewNav,
+  parseHistoryView,
+  type HistoryView,
+} from '@/features/history'
+import { fetchAuthenticated } from '@/lib/api.server'
 
-const HISTORY_DESCRIPTION = 'Книжки, які ви брали або позичали іншим.'
+interface HistoryPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+const EMPTY_MESSAGES: Readonly<Record<HistoryView, string>> = {
+  borrowed: 'Ви ще нічого не брали.',
+  lent: 'У вас ще нічого не брали.',
+}
 
 /**
- * §6.6, «Моя історія»: що я брав і що в мене брали.
- *
- * Обидва списки завжди з іменами — viewer тут сторона кожного лоану, а не
- * стороння людина, тож §6.6 до нього не застосовується.
+ * No loading.tsx: auth and data share one request, so streaming a shell before
+ * its 401 could turn the early HTTP redirect into a client redirect inside 200.
  */
-export default function HistoryPage() {
-  return (
-    <SessionBoundary title="Моя історія" description={HISTORY_DESCRIPTION}>
-      <HistoryScreen />
-    </SessionBoundary>
-  )
-}
-
-type View = 'borrowed' | 'lent'
-
-const HISTORY_VIEW_OPTIONS: readonly SegmentedOption<View>[] = [
-  { value: 'borrowed', label: 'Що я брав' },
-  { value: 'lent', label: 'Що в мене брали' },
-]
-
-function HistoryScreen() {
-  const [view, setView] = useState<View>('borrowed')
-  const { state } = useMyHistory()
+export default async function HistoryPage({ searchParams }: HistoryPageProps) {
+  const { view: rawView } = await searchParams
+  const view = parseHistoryView(rawView)
+  const history = await fetchAuthenticated('/me/history', myHistoryResponseSchema)
 
   return (
-    <Shell title="Моя історія" description={HISTORY_DESCRIPTION}>
-      <SegmentedControl
-        className="mb-8"
-        label="Вигляд історії"
-        value={view}
-        options={HISTORY_VIEW_OPTIONS}
-        onValueChange={setView}
-      />
-
-      {state.status === 'loading' && <LoadingState>Завантажую історію…</LoadingState>}
-      {state.status === 'error' && <FormStatus error={new Error(state.message)} />}
-
-      {state.status === 'ready' &&
-        (state.data[view].length === 0 ? (
-          <EmptyState title="Історія поки порожня">
-            {view === 'borrowed' ? 'Ви ще нічого не брали.' : 'У вас ще нічого не брали.'}
-          </EmptyState>
-        ) : (
-          <ul className="books">
-            {state.data[view].map((item) => (
-              <HistoryCard key={item.entry.loanId} item={item} />
-            ))}
-          </ul>
-        ))}
+    <Shell {...HISTORY_SHELL}>
+      <HistoryViewNav view={view} />
+      <HistoryList items={history[view]} emptyMessage={EMPTY_MESSAGES[view]} />
     </Shell>
-  )
-}
-
-function HistoryCard({ item }: { item: MyHistoryEntry }) {
-  return (
-    <li className="book">
-      <Link className="book__title" href={`/works/${item.copy.work.id}`}>
-        {item.copy.work.title}
-      </Link>
-      <AuthorLine authors={item.copy.authors} />
-      <EditionLine edition={item.copy.edition} />
-
-      <ul className="copies">
-        <HistoryEntryLine entry={item.entry} />
-      </ul>
-
-      <span className="book__meta">
-        <Link href={`/copies/${item.copy.id}/history`}>Уся історія примірника</Link>
-      </span>
-    </li>
   )
 }

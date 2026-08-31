@@ -57,7 +57,8 @@ export const AUTH_SHUTDOWN_TIMEOUT_MS = 30 * 1000
 export const AUTH_SHUTDOWN_TIMEOUT = Symbol('AUTH_SHUTDOWN_TIMEOUT')
 
 /**
- * Ім'я кукі. Префікс `__Host-` навмисно не використовується: він вимагає Secure,
- * а в dev фронт і API ходять по http://localhost.
+ * Ім'я кукі. Живе в `@bookswap/shared`, бо його читають обидва застосунки: тут —
+ * guard і контролер, у `apps/web` — серверний рендер, який прокидає кукі в API.
+ * Реекспорт, а не другий літерал: §4.1.
  */
-export const SESSION_COOKIE_NAME = 'bookswap_session'
+export { SESSION_COOKIE_NAME } from '@bookswap/shared'

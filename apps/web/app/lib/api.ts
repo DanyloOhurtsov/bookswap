@@ -41,6 +41,15 @@ interface RequestOptions<T> {
   /** Схема з `@bookswap/shared`, якою розбирається успішна відповідь. */
   schema?: ZodType<T>
   signal?: AbortSignal
+  /**
+   * Додаткові заголовки запиту.
+   *
+   * Існують заради серверного рендеру: у Node немає сховища кукі, тож
+   * `credentials: 'include'` там не робить нічого, і сесію доводиться класти в
+   * `Cookie` вручну (`api.server.ts`). У браузері не використовується — кукі
+   * додає сам fetch.
+   */
+  headers?: Record<string, string>
 }
 
 /**
@@ -69,14 +78,17 @@ export interface ApiResponse<T> {
  */
 export async function apiRequestWithRedirect<T = void>(
   path: string,
-  { method = 'GET', body, schema, signal }: RequestOptions<T> = {},
+  { method = 'GET', body, schema, signal, headers }: RequestOptions<T> = {},
 ): Promise<ApiResponse<T>> {
   const response = await fetch(`${API_URL}${API_PREFIX}${path}`, {
     method,
     credentials: 'include',
     cache: 'no-store',
     signal,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: {
+      ...(body === undefined ? undefined : { 'Content-Type': 'application/json' }),
+      ...headers,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 

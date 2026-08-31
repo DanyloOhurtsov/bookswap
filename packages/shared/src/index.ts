@@ -1,4 +1,4 @@
-export { API_PREFIX } from './constants'
+export { API_PREFIX, SESSION_COOKIE_NAME } from './constants'
 export {
   API_ERROR_CODES,
   apiErrorCodeSchema,
