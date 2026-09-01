@@ -16,7 +16,12 @@ import { ConfirmDialog } from '../../components/confirm-dialog'
 import { SelectField, TextField } from '../../components/form-field'
 import { FormStatus } from '../../components/form-status'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CONDITION_LABELS, LOAN_ACTION_LABELS, LOAN_STATUS_LABELS, formatDate } from '../../lib/labels'
+import {
+  CONDITION_LABELS,
+  LOAN_ACTION_LABELS,
+  LOAN_STATUS_LABELS,
+  formatDate,
+} from '../../lib/labels'
 import { counterpartOf, roleOf, useLoan, useLoans } from '../../lib/use-loans'
 import { useSession } from '../../lib/use-session'
 

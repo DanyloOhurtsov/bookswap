@@ -23,7 +23,12 @@ import { ConfirmDialog } from '../../components/confirm-dialog'
 import { SelectField, TextField } from '../../components/form-field'
 import { FormStatus } from '../../components/form-status'
 import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
-import { CONDITION_LABELS, COPY_STATUS_LABELS, VISIBILITY_LABELS, formatDate } from '../../lib/labels'
+import {
+  CONDITION_LABELS,
+  COPY_STATUS_LABELS,
+  VISIBILITY_LABELS,
+  formatDate,
+} from '../../lib/labels'
 import { useBorrowedLibrary, useOwnLibrary, type LibraryView } from '../../lib/use-library'
 import { useSession } from '../../lib/use-session'
 import { validate, type FieldErrors } from '../../lib/validation'
