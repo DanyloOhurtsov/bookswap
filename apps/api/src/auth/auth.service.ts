@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger, type OnModuleDestroy } from '@n
 import { ConfigService } from '@nestjs/config'
 import { API_ERROR_CODES } from '@bookswap/shared'
 import type { ConfirmPasswordResetRequest, LoginRequest, RegisterRequest } from '@bookswap/shared'
+import { AnalyticsService } from '../analytics/analytics.service'
 import { ApiException } from '../common/api.exception'
 import { isUniqueViolation } from '../common/prisma-errors'
 import { EMAIL_SENDER, type EmailSender } from '../email/email-sender'
@@ -97,6 +98,7 @@ export class AuthService implements OnModuleDestroy {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
     private readonly config: ConfigService,
@@ -372,7 +374,7 @@ export class AuthService implements OnModuleDestroy {
     // Дозвіл береться ПЕРШИМ — до хешування пароля й до будь-якого звернення до
     // БД. Усе, що нижче, виконується під ним до кінця навіть якщо SIGTERM
     // прилетить наступної мілісекунди.
-    return this.runWorkflow('реєстрація', async (workflow) => {
+    const authenticated = await this.runWorkflow('реєстрація', async (workflow) => {
       const passwordHash = await this.passwords.hash(request.password)
 
       const existing = await this.prisma.user.findUnique({
@@ -415,6 +417,15 @@ export class AuthService implements OnModuleDestroy {
       // обмеженим прапорцем emailVerified, який фронт показує в профілі.
       return { user, sessionToken: await this.sessions.create(user.id) }
     })
+
+    await this.analytics.record({
+      type: 'SIGNUP_COMPLETED',
+      subjectUserId: authenticated.user.id,
+      domainEntityId: authenticated.user.id,
+      properties: {},
+    })
+
+    return authenticated
   }
 
   async login(request: LoginRequest): Promise<Authenticated> {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { AccessModule } from '../access/access.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
 import { AuthModule } from '../auth/auth.module'
 import { CatalogModule } from '../catalog/catalog.module'
 import { LibraryController } from './library.controller'
@@ -11,7 +12,7 @@ import { LibraryService } from './library.service'
  * поводяться по-різному на тому самому слові.
  */
 @Module({
-  imports: [AuthModule, AccessModule, CatalogModule],
+  imports: [AuthModule, AccessModule, AnalyticsModule, CatalogModule],
   controllers: [LibraryController],
   providers: [LibraryService],
 })

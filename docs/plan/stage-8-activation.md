@@ -397,7 +397,7 @@ funnel-звіт неповним без продуктової причини. �
   `AnalyticsService.record()` (best-effort, §3) + `dedupe-key.ts` (§2.2) + enum
   типів і Zod-схеми `properties` (§2.5), без жодного call site. DB-тести на
   `SetNull` і на відсутність FK до `Copy`/`Loan`/`Friendship`.
-- **8a-2** — інтеграція `SIGNUP_COMPLETED` (зовні `runWorkflow`, §5) і `BOOK_ADDED`
+- **8a-2 — завершено.** Інтеграція `SIGNUP_COMPLETED` (зовні `runWorkflow`, §5) і `BOOK_ADDED`
   (`method: 'MANUAL'`). e2e на незмінність результату при збої аналітики й на
   порядок виклику.
 - **8a-3** — інтеграція `FRIEND_ACCEPTED` (дві події, §4-§5, зі зміною сигнатури
@@ -446,5 +446,5 @@ funnel-звіт неповним без продуктової причини. �
 подвійним `FRIEND_ACCEPTED`, позицією виклику `SIGNUP_COMPLETED`, точним
 формулюванням гарантій доставки, розташуванням таксономії, визначенням active
 user, точними текстами CLI, механізмом non-blocking-failure тесту та назвою поля
-`occurredAt`). 8a-1 реалізовано (§12). Наступний крок — підетап 8a-2 за окремим
+`occurredAt`). 8a-1 і 8a-2 реалізовано (§12). Наступний крок — підетап 8a-3 за окремим
 запитом.
