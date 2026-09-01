@@ -4,6 +4,7 @@ import { type SessionState } from '@/app/lib/use-session'
 import { NAVBAR_LINKS_AUTH, NAVBAR_LINKS_GUEST } from '@/constants/navigation'
 import { NavBarAvatar } from '@/components/NavBar/NavBarAvatar'
 import { NavBarLogo } from '@/components/NavBar/NavBarLogo'
+import { NavBarNotifications } from '@/components/NavBar/NavBarNotifications'
 import { ThemeSwitcher } from '@/components/ThemeSwitcher'
 
 const NavContent = ({ state }: { state: SessionState }) => {
@@ -39,6 +40,7 @@ const AuthNav = ({ user }: { user: Me }) => {
       </nav>
       <div className="flex items-center gap-2">
         <ThemeSwitcher />
+        <NavBarNotifications />
         <NavBarAvatar user={user} />
       </div>
     </div>

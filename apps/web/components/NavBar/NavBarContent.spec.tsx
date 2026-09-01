@@ -16,6 +16,10 @@ jest.mock('@/components/NavBar/NavBarAvatar', () => ({
   ),
 }))
 
+jest.mock('@/components/NavBar/NavBarNotifications', () => ({
+  NavBarNotifications: () => <button type="button">Notifications</button>,
+}))
+
 const user: Me = {
   id: 'user-1',
   email: 'reader@example.com',
@@ -61,6 +65,7 @@ describe('NavContent', () => {
     expect(screen.getByRole('link', { name: 'Головна' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Друзі' })).toHaveAttribute('href', '/friends')
     expect(screen.getByRole('link', { name: 'Історія' })).toHaveAttribute('href', '/history')
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument()
     expect(screen.getByTestId('profile-menu')).toHaveTextContent('Reader One')
     expect(screen.queryByRole('link', { name: 'Увійти' })).not.toBeInTheDocument()
   })
