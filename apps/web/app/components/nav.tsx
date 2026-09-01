@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ThemeSwitcher } from '@/components/ThemeSwitcher'
 import { useSession } from '../lib/use-session'
 
 const NavBar = () => {
@@ -29,6 +30,7 @@ const NavBar = () => {
           <Link href="/login">Увійти</Link>
         </>
       )}
+      <ThemeSwitcher />
     </nav>
   )
 }
