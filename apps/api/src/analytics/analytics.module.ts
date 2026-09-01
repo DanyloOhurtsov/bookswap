@@ -3,15 +3,15 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { AnalyticsService } from './analytics.service'
 
 /**
- * docs/plan/stage-8-activation.md, 8a-1 — лише сховище й сервіс.
+ * docs/plan/stage-8-activation.md — Stage 8a product analytics storage and service.
  *
  * `PrismaModule` імпортується явно, хоч він `@Global` (`prisma/prisma.module.ts`)
  * і `PrismaService` був би доступний і без цього: залежність від Prisma тут не
  * випадкова, а те, чому цей модуль взагалі існує, і явний `imports` документує
  * це прямо в модулі, а не лишає читача здогадуватися по глобальності.
  *
- * Навмисно без контролера, endpoint'у, job'и чи таймера (§7) — у 8a-1 жоден
- * доменний сервіс ще не інжектить `AnalyticsService`.
+ * There is intentionally no controller, endpoint, job, or timer (§7). Domain services
+ * inject `AnalyticsService` only at approved after-commit mutation points.
  */
 @Module({
   imports: [PrismaModule],

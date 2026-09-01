@@ -13,6 +13,7 @@ import {
 } from '@bookswap/shared'
 import { AccessService, blocked } from '../access/access.service'
 import { copyVisibleTo, holderNamesVisibleTo, isVisibleTo } from '../access/visibility'
+import { AnalyticsService } from '../analytics/analytics.service'
 import { TextNormalizer } from '../catalog/text-normalizer'
 import { ApiException } from '../common/api.exception'
 import { PrismaService } from '../prisma/prisma.service'
@@ -90,6 +91,7 @@ const WITH_CATALOG = {
 export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
     private readonly access: AccessService,
     private readonly normalizer: TextNormalizer,
   ) {}
@@ -216,6 +218,13 @@ export class LibraryService {
         acquiredAt: toDate(request.acquiredAt),
       },
       include: WITH_CATALOG,
+    })
+
+    await this.analytics.record({
+      type: 'BOOK_ADDED',
+      subjectUserId: userId,
+      domainEntityId: copy.id,
+      properties: { method: 'MANUAL' },
     })
 
     return { copy: toOwnCopy(copy) }

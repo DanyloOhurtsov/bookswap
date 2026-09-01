@@ -41,8 +41,7 @@ function safeEventTypeLabel(candidate: unknown): ProductEventType | 'UNKNOWN' {
  * транзакції. Гарантія: збій тут ніколи не змінює результат чи успішність
  * батьківської операції. Це не атомарний запис у тій самій транзакції.
  *
- * У 8a жоден доменний сервіс ще не викликає `record()` — call sites приходять у
- * 8a-2/8a-3.
+ * Call sites are limited to the after-commit mutation points approved for Stage 8a.
  */
 @Injectable()
 export class AnalyticsService {

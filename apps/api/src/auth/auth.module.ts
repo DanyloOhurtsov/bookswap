@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { AnalyticsModule } from '../analytics/analytics.module'
 import { BACKGROUND_MODE, DEFAULT_BACKGROUND_MODE } from '../common/background'
 import { AuthController } from './auth.controller'
 import { AUTH_SHUTDOWN_TIMEOUT, AUTH_SHUTDOWN_TIMEOUT_MS } from './auth.constants'
@@ -21,6 +22,7 @@ import { SessionService } from './session.service'
  * причини — див. `common/background.ts`.
  */
 @Module({
+  imports: [AnalyticsModule],
   controllers: [AuthController],
   providers: [
     AuthService,
