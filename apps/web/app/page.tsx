@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { HealthStatus } from './health-status'
 
 /**
@@ -13,20 +12,6 @@ export default function HomePage() {
         Сервіс обміну фізичними книжками. Готові акаунт, профіль, дружба, каталог, особиста
         бібліотека, позичання з історією та сповіщення в застосунку.
       </p>
-
-      <nav className="actions" aria-label="Основні дії">
-        <Link href="/register">Створити акаунт</Link>
-        <Link href="/login">Увійти</Link>
-        <Link href="/profile">Профіль</Link>
-        <Link href="/friends">Друзі</Link>
-        <Link href="/catalog">Каталог</Link>
-        <Link href="/library">Моя бібліотека</Link>
-        <Link href="/wishlist">Вішлист</Link>
-        <Link href="/loans">Позичання</Link>
-        <Link href="/history">Історія</Link>
-        <Link href="/notifications">Сповіщення</Link>
-        <Link href="/notifications/settings">Налаштування сповіщень</Link>
-      </nav>
 
       <HealthStatus />
     </main>
