@@ -13,13 +13,13 @@ import {
   type PublicUser,
   type UserSearchResult,
 } from '@bookswap/shared'
-import { ConfirmDialog } from '../components/confirm-dialog'
-import { SelectField, TextField } from '../components/form-field'
-import { FormStatus } from '../components/form-status'
-import { ApiRequestError, apiRequest, describeError } from '../lib/api'
-import { useFriends } from '../lib/use-friends'
-import { useSession } from '../lib/use-session'
-import { validate, type FieldErrors } from '../lib/validation'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { SelectField, TextField } from '@/components/Form/FormFields'
+import { FormStatus } from '@/components/Form/FormStatus'
+import { ApiRequestError, apiRequest, describeError } from '../../lib/api'
+import { useFriends } from '../../lib/use-friends'
+import { useSession } from '../../lib/use-session'
+import { validate, type FieldErrors } from '../../lib/validation'
 
 /**
  * §6.1: два взаємовиключні режими пошуку. Режим — явний вибір людини, а не
