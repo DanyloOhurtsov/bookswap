@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { AccessModule } from '../access/access.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
 import { AuthModule } from '../auth/auth.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { LoanService } from './loan.service'
@@ -13,7 +14,7 @@ import { LoansController } from './loans.controller'
  * транзакції, що й перехід.
  */
 @Module({
-  imports: [AuthModule, AccessModule, NotificationsModule],
+  imports: [AuthModule, AccessModule, AnalyticsModule, NotificationsModule],
   controllers: [LoansController],
   providers: [LoanService],
   exports: [LoanService],
