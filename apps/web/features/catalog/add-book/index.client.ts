@@ -1,5 +1,6 @@
 export { AddBookShell } from './components/AddBookShell'
 export { LanguageField } from './components/LanguageField'
+export { SearchStep } from './components/SearchStep'
 export {
   completeAddBook,
   continueAfterEdition,
