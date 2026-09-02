@@ -1,0 +1,440 @@
+# Етап 8b–8h — inventory activation
+
+**Статус:** затверджений execution plan; реалізацію не розпочато.
+
+**Передумова:** Етап 8a (product analytics) завершено.
+
+**Джерело пріоритету:** `docs/plan/roadmap-v2.md`, Етап 8.
+
+**Scope:** швидке послідовне додавання, barcode/camera scan, виправлення metadata,
+CSV import і onboarding до перших 10 книг.
+
+Цей документ закриває два відкриті рішення roadmap для Етапу 8: точний CSV
+format і права на виправлення спільного каталогу. Після затвердження він є єдиним
+execution plan для незавершеної частини Етапу 8.
+
+---
+
+## 1. Product outcome і порядок пріоритетів
+
+Користувач може перетворити фізичну полицю на usable library без повторного
+заповнення тих самих форм і без страху створити невідомо що:
+
+1. після першої книги одразу додає наступну або ще один примірник;
+2. сканує ISBN камерою, але завжди має ручний fallback;
+3. бачить і виправляє metadata до та після додавання;
+4. імпортує до 200 позицій через preview і один atomic commit;
+5. розуміє прогрес до перших 10 книг і переходить до запрошення друзів.
+
+Порядок реалізації визначає ризик, а не видимість функції: спочатку безпечна
+архітектурна межа, далі швидкий repeat-add і scanner, потім metadata correction,
+без якої не можна випускати CSV, після цього import і onboarding.
+
+Метрики вже пишуться як `BOOK_ADDED.method = MANUAL | BARCODE | CSV`. Операційний
+стан UI (`ownedCopyCount`) береться з доменних даних, а не з best-effort analytics.
+
+## 2. Підтверджений baseline кодової бази
+
+- `apps/web/app/(pages)/catalog/new/page.tsx` — 1282-рядковий Client Component,
+  який містить увесь wizard, локальний стан, запити й усі кроки. Це суперечить
+  feature-first і thin-route правилам `docs/CONVENTIONS.md`.
+- Наявний wizard уже підтримує три шляхи: existing Edition; existing Work →
+  Translation/Edition; new Work → Translation/Edition. ISBN запускає паралельно
+  `/catalog/search/candidates` і `/catalog/lookup`.
+- `POST /me/library` створює рівно один фізичний `Copy`; це правильний доменний
+  контракт і він не отримує поле `quantity`.
+- `Work` і `Edition` мають `createdById`; `Translation` не має автора створення.
+  Жодної глобальної admin-role у системі немає.
+- `Work`, `Translation` і `Edition` не мають optimistic-concurrency revision та
+  історії змін.
+- Open Library provider виконує single-ISBN lookup; import не повинен викликати
+  його або БД послідовно для кожного рядка.
+
+## 3. Зафіксовані рішення
+
+### R1. Межа web feature
+
+Перед новою поведінкою wizard переноситься до
+`apps/web/features/catalog/add-book/**` без зміни UX. Route `page.tsx` стає Server
+Component приблизно до 50 рядків, а найнижча інтерактивна межа експортується з
+`index.client.ts`. Server/client exports не змішуються, `export *` не з'являється.
+
+Розбиття робиться малими behavior-preserving PR, а не одним механічним diff на
+1282 рядки. Усі витягнуті й нові форми використовують React Hook Form + shared
+Zod schema; server state не дублюється через `useEffect`/`useState`.
+
+### R2. Barcode scanner і privacy
+
+- Адаптер використовує `@zxing/browser`, завантажений dynamic import лише після
+  натискання «Сканувати». Нативний `BarcodeDetector` не є production dependency:
+  API експериментальний і має обмежену browser availability.
+- Камера стартує тільки після user gesture через `getUserMedia` з
+  `facingMode: { ideal: 'environment' }`; feature доступна лише в secure context
+  (`https` або `localhost`).
+- Декодується EAN-13. Значення проходить ту саму `normalizeIsbn13` і Zod-валідацію,
+  що ручне введення, а потім той самий candidates + lookup flow.
+- Відеокадри не завантажуються, не зберігаються й не логуються. Усі
+  `MediaStreamTrack` зупиняються після успіху, cancel, error, unmount і navigation.
+- Ручне поле ISBN завжди видиме. Denied permission, відсутня камера, timeout і
+  unsupported browser дають зрозумілий fallback, а не dead end.
+
+### R3. Джерело `BOOK_ADDED`
+
+Shared `AddCopyRequest` отримує optional `entryMethod: 'MANUAL' | 'BARCODE'` із
+default `MANUAL` на API. Сервер записує analytics після створення Copy. Значення не
+є permission-рішенням; воно лише класифікує activation channel.
+
+CSV не викликає `POST /me/library` для кожного рядка: import service створює Copy
+у спільній транзакції та сам записує `method: 'CSV'` після її коміту.
+
+### R4. Exact CSV v1 contract
+
+Файл — UTF-8 CSV за RFC 4180, з optional UTF-8 BOM. Приймається comma або semicolon,
+визначений за header; mixed/ambiguous delimiter відхиляється. Header обов'язковий,
+порядок фіксований, невідомі/дубльовані колонки й рядки іншої довжини — помилка.
+
+```csv
+isbn13,title,authors,orig_lang,first_pub_year,edition_lang,translator,translation_source_lang,translation_year,is_abridged,has_notes,translation_notes,publisher,edition_year,page_count,cover_url,format,condition,visibility,note,acquired_at,quantity
+```
+
+Правила:
+
+- `isbn13` обов'язковий у кожному рядку й після нормалізації має бути ISBN-13;
+- `quantity` — integer `1..20`, default `1`; total copies в import — максимум 500;
+- `authors` — імена через `|`, усі з роллю `AUTHOR`; literal `|` у v1 не
+  підтримується;
+- `orig_lang`, `edition_lang`, `translation_source_lang` — чинні ISO 639-1 коди;
+- `first_pub_year`, `translation_year`, `edition_year` і `page_count` проходять
+  чинні shared limits; `acquired_at` — `YYYY-MM-DD`;
+- boolean — тільки `true`/`false`; `format`, `condition`, `visibility` — чинні
+  enum values; defaults: `PAPERBACK`, `GOOD`, `FRIENDS`;
+- catalog-поля optional, якщо ISBN уже однозначно резолвиться. Для нового catalog
+  chain після lookup вони мусять утворити валідні Work/Translation/Edition дані;
+- якщо `edition_lang != orig_lang`, потрібні дані перекладу або ручне рішення;
+- однаковий ISBN дозволений через `quantity`; повторений нормалізований рядок у
+  тому самому файлі має `DUPLICATE_ROW` і не підсумовується непомітно.
+
+Шаблон `/library-import-template.csv` зберігається у web assets. Contract test
+читає реальний asset тим самим parser і гарантує рівність header зі shared
+константою. Максимум: 200 data rows і 48 KiB UTF-8 content; більший файл
+відхиляється до parse. Raw CSV і приватна `note` не потрапляють у logs/analytics.
+
+### R5. Parse, preview і commit
+
+Сервер парсить через `csv-parse` з `bom: true`, `columns` із fixed header,
+`relax_column_count: false`, `skip_empty_lines: true`, без implicit casts і з
+`max_record_size`. Після синтаксису кожне поле проходить shared Zod schema.
+
+`POST /me/library/imports/preview` не створює Work, Translation, Edition або Copy.
+Він повертає draft та для кожного рядка один статус:
+
+- `READY_EXISTING_EDITION` — точний ISBN уже є;
+- `READY_CREATE_CHAIN` — lookup/candidate resolution однозначні й даних досить;
+- `NEEDS_REVIEW` — неоднозначний кандидат або бракує metadata;
+- `INVALID` — стабільні validation errors;
+- `SKIPPED` — користувач явно пропустив рядок.
+
+Commit дозволений лише коли кожен рядок `READY_*` або `SKIPPED`. Він виконує всі
+catalog mutation і Copy inserts в одній Prisma transaction: або весь import
+комітиться, або доменні дані не змінюються. Зовнішніх HTTP-викликів у транзакції
+немає. Після коміту `BOOK_ADDED/CSV` записується для кожного створеного Copy за
+best-effort моделлю Етапу 8a.
+
+### R6. Safe rerun, storage і retention
+
+Нова `LibraryImport` має unique `(ownerId, sourceHash)`, де `sourceHash` — SHA-256
+нормалізованого UTF-8 content без BOM. Це opaque/pseudonymous equality key, не
+анонімізація.
+
+- Preview того самого файла повертає чинний draft або завершений summary.
+- Commit бере import row lock і перевіряє статус усередині transaction.
+- Повторний commit уже завершеного import повертає попередній success response й
+  не створює нові Copy.
+- Draft rows живуть 24 години; прострочення очищається lazy під час наступного
+  preview/get, без scheduler.
+- Після commit payload рядків видаляється. `LibraryImport` зберігає hash, статус,
+  counts і timestamps для idempotency; сирий файл не зберігається.
+
+Користувач із реальною другою фізичною копією використовує `quantity`, repeat-add
+або новий файл зі зміненим content. Кнопки «імпортувати ще раз попри той самий
+hash» у Stage 8 немає.
+
+### R7. Batched catalog resolution
+
+Preview спочатку одним запитом отримує всі локальні Edition за ISBN. Cache hits
+ISBN lookup також читаються batch. Missing ISBN групуються у bounded provider
+requests по максимум 50 bibkeys; Open Library adapter розширюється `lookupMany`,
+але зберігає той самий normalizer/cache contract. Згідно з актуальними правилами
+провайдера production додає ідентифікований `User-Agent` із contact email, а
+missing config не маскується дефолтною персональною адресою.
+
+Для нових ISBN кандидатів Work шукає один batched resolver, а не `await` у циклі:
+SQL `VALUES`/CTE з row key і lateral top-N reuse чинного trigram/ranking contract.
+Жодних N+1 для Edition, candidate, Work, Translation чи author hydration.
+
+External timeout/partial provider failure не перетворюється на «книгу не знайдено»:
+рядок отримує retryable error, а draft лишається без domain writes.
+
+### R8. Права на catalog correction
+
+Глобальна admin-role не додається. Автентифікований користувач може змінити:
+
+- `Work`, якщо `Work.createdById == userId` або він володіє Copy будь-якого Edition
+  цього Work;
+- `Edition`, якщо `Edition.createdById == userId` або він володіє Copy цього
+  Edition;
+- `Translation`, якщо `Translation.createdById == userId` або він володіє Copy
+  Edition, що посилається на цю Translation.
+
+Перевірка виконується в API одним permission query всередині mutation flow. Право
+володіння — поточне; воно не дає права видаляти, merge або переносити сутність до
+іншого Work. Інші користувачі отримують `403 CATALOG_EDIT_FORBIDDEN`.
+
+### R9. Audit і optimistic concurrency
+
+`Work`, `Translation`, `Edition` отримують `revision Int @default(1)`;
+`Translation` також `createdById` і `createdAt`. Existing Translation backfill бере
+`Work.createdById`; `createdAt` для старих рядків дорівнює часу міграції й не
+видається за історичну дату. Після backfill creator field стає required.
+
+Кожен PATCH передає `expectedRevision`. Conditional update збільшує revision;
+застарілий клієнт отримує `409 CATALOG_REVISION_CONFLICT` і свіжу сутність для
+повторного рішення, без silent overwrite.
+
+Immutable `CatalogRevision` зберігає `entityType`, `entityId`, nullable actor з
+`onDelete: SetNull`, before/after JSON, from/to revision і `createdAt`. Він не має
+FK до catalog entity, щоб пережити майбутній merge. Update і audit insert — одна
+transaction. UI не потребує public audit endpoint у Stage 8.
+
+### R10. Дозволені metadata fields
+
+- Work: `title`, `origLang`, `firstPubYear`, `description`, повний список
+  `authors` (`name`, `role`, `position`). Заміна зв'язків не видаляє Author rows.
+- Translation: `translator`, `lang`, `sourceLang`, `year`, `isAbridged`,
+  `hasNotes`, `notes`.
+- Edition: `publisher`, `year`, `isbn13`, `pageCount`, `coverUrl`, `format` і
+  `translationId`, але Translation мусить належати тому самому Work.
+
+Не редагуються `workId`, `createdById`, merge fields, rating aggregates, Copy/Loan
+через catalog PATCH. Author як глобальна сутність не перейменовується. ISBN unique
+conflict і merged Work лишають чинні canonical/error semantics.
+
+`WorkDetailResponse` додає `viewerCapabilities` (`canEditWork`,
+`editableTranslationIds`, `editableEditionIds`), щоб UI не вгадував permissions.
+
+### R11. Repeat-add і onboarding
+
+Після успіху wizard показує три дії:
+
+1. «Ще один такий примірник» — той самий Edition, новий Copy;
+2. «Додати наступну книгу» — чистий search step;
+3. «Сканувати наступну» — відкриває camera flow.
+
+Для наступної книги зберігаються лише `condition` і `visibility` як session defaults;
+`note` та `acquiredAt` завжди очищаються. Жодного localStorage.
+
+`GET /me/activation` повертає `ownedCopyCount`, `target: 10`, `hasReachedTarget` і
+`nextAction`. Checklist рендериться server-first у бібліотеці й після add/import;
+при 10 книгах CTA веде до чинної сторінки friends. Invite links належать Етапу 9.
+
+## 4. API і shared contracts
+
+Нові endpoints:
+
+| Method  | Route                                     | Призначення                         |
+| ------- | ----------------------------------------- | ----------------------------------- |
+| `PATCH` | `/works/:id`                              | metadata + `expectedRevision`       |
+| `PATCH` | `/translations/:id`                       | metadata + `expectedRevision`       |
+| `PATCH` | `/editions/:id`                           | metadata + `expectedRevision`       |
+| `POST`  | `/me/library/imports/preview`             | parse/resolution, без domain writes |
+| `GET`   | `/me/library/imports/:id`                 | власний draft/summary               |
+| `PATCH` | `/me/library/imports/:id/rows/:rowNumber` | resolve або skip                    |
+| `POST`  | `/me/library/imports/:id/commit`          | atomic idempotent commit            |
+| `GET`   | `/me/activation`                          | прогрес до 10 книг                  |
+
+Усі JSON request/response/error schemas живуть у `packages/shared`, DTO мають
+parity tests. Import draft завжди scoped до owner; чужий id повертає `404`, щоб не
+розкривати існування. Preview має окремий authenticated throttle (5/min/user або
+еквівалентний чинній інфраструктурі), commit — 10/min і залишається idempotent.
+
+Стабільні row errors: `INVALID_ISBN`, `INVALID_FIELD`, `DUPLICATE_ROW`,
+`LOOKUP_UNAVAILABLE`, `LOOKUP_NOT_FOUND`, `MISSING_CATALOG_DATA`,
+`AMBIGUOUS_CATALOG_MATCH`. Import errors: `IMPORT_TOO_LARGE`, `IMPORT_EXPIRED`,
+`IMPORT_NOT_READY`. Текст локалізує web; API повертає code і structured details.
+
+## 5. Data model і migration safety
+
+1. Additive migration: `revision` columns, nullable `Translation.createdById`,
+   `Translation.createdAt @default(now())`, `LibraryImport`, `LibraryImportRow`,
+   `CatalogRevision` та індекси.
+2. SQL backfill Translation creator через parent Work, перевірка `NULL = 0`.
+3. Наступний migration step робить creator field required.
+4. Індекси щонайменше: import owner/hash unique, owner/status, expiresAt;
+   revisions entity/id+createdAt; Translation createdById.
+5. Міграція запускається на copy production-like DB і має documented rollback.
+
+`CatalogRevision.before/after` і draft payload валідовуються при записі та читанні;
+JSON не замінює shared contract. Жодного historical backfill audit не вигадується.
+
+## 6. Послідовність implementation PR
+
+Кожен PR відповідає `docs/CONVENTIONS.md`, бажано близько до 400 semantic diff,
+проходить root `gate.sh` і не починає наступний підетап до merge попереднього.
+
+### 8b-1 — add-book model, transitions і shell
+
+- Винести wizard types, pure transitions/reset helpers, shell і language field;
+  route behavior не міняти.
+- Додати unit tests transition/reset invariants.
+- **DoD:** ті самі три шляхи wizard і наявні route tests green; route ще може бути
+  client boundary. **Не робити:** scan, repeat-add, нові API.
+
+### 8b-2 — search і candidate selection
+
+- Винести SearchStep/CandidateCard та API adapter; form — RHF + shared Zod.
+- **DoD:** title/ISBN, parallel candidates + lookup, retry й selection мають ті
+  самі результати; focused component tests green.
+
+### 8b-3 — Work і author forms
+
+- Винести WorkStep/AuthorRow; authors — `useFieldArray`, порядок і ролі не губляться.
+- **DoD:** existing/new Work branches, validation і API errors мають regression
+  coverage; жодної server state копії в effect.
+
+### 8b-4 — Translation form
+
+- Винести TranslationStep на RHF + shared Zod.
+- **DoD:** original-language skip і translation create branches не змінилися;
+  nullable/boolean fields і API errors covered.
+
+### 8b-5 — Edition і Copy forms
+
+- Винести EditionStep та CopyStep на RHF + shared Zod.
+- **DoD:** lookup-prefill лишається editable; existing Edition не створюється
+  повторно; Copy defaults/date/note covered.
+
+### 8b-6 — orchestrator і low client boundary
+
+- Винести client wizard/orchestration у feature; зробити route Server Component
+  з explicit `index.client.ts` export; перенести/розділити route tests.
+- **DoD:** `page.tsx` приблизно до 50 рядків; усі три wizard paths green; initial
+  bundle не містить scanner; lint/typecheck/tests/build/root gate green.
+
+### 8c — quick sequential add
+
+- Реалізувати три post-success actions і точні reset rules R11.
+- Передати `entryMethod` і покрити API analytics integration.
+- **DoD:** кілька Copy додаються без повернення до catalog; double click не створює
+  випадкову копію; browser test перевіряє repeat flow і back/forward.
+
+### 8d — barcode/camera scan
+
+- Додати lazy scanner adapter, lifecycle cleanup і manual fallback R2.
+- **DoD:** валідний scan і manual ISBN дають той самий server-resolved результат;
+  BARCODE event записано; permission/error/cleanup component tests і manual mobile
+  matrix (iOS Safari, Android Chrome, desktop no-camera) пройдені.
+
+### 8e-1 — correction schema, audit і contracts
+
+- Additive migration/backfill, shared PATCH schemas/responses/error codes.
+- **DoD:** migration up/down strategy перевірена; DTO parity, enum parity і schema
+  tests green. **Не робити:** endpoints/UI.
+
+### 8e-2 — correction permissions і API
+
+- Реалізувати PATCH transactions, permission query, revision conflict і audit.
+- **DoD:** creator/owner/stranger, concurrent edit, unique ISBN, merged Work,
+  audit atomicity та rollback покриті integration/DB tests; без N+1.
+
+### 8e-3 — correction UI
+
+- RHF + Zod форми з capabilities, optimistic update/rollback і conflict refresh.
+- **DoD:** keyboard/mobile/error states перевірені; неавторизований edit control не
+  показується, але API лишається остаточною межею permissions.
+
+### 8f-1 — CSV parser і import persistence
+
+- Shared CSV contract/constants, parser, template, import models і TTL behavior.
+- **DoD:** BOM, comma/semicolon, quotes/newlines, malformed/mixed headers, caps,
+  duplicate rows і Unicode covered; parser fuzz cases не падають процесом.
+
+### 8f-2 — batched preview API
+
+- Реалізувати lookupMany, batched DB/candidate resolver і draft endpoints.
+- **DoD:** preview робить нуль domain writes; query-count test не росте лінійно з
+  rows; provider partial failure retryable; owner isolation/rate limit green.
+
+### 8f-3 — CSV preview UI
+
+- Upload/template, row table, filters, errors, edit/choose/skip і resume draft.
+- **DoD:** commit disabled до повної resolution; 200 rows usable на mobile/desktop;
+  private note рендериться лише як text, ніколи як HTML/formula execution.
+
+### 8g — atomic import commit і analytics
+
+- Transactional catalog/Copy creation, row lock, safe rerun і cleanup R5–R6.
+- **DoD:** concurrent/double commit створює одну множину Copy; injected failure
+  залишає нуль domain writes; quantity і 500-copy cap tested; кожен Copy має один
+  idempotent `BOOK_ADDED/CSV` attempt після коміту.
+
+### 8h — onboarding і закриття Етапу 8
+
+- Server-first activation endpoint/checklist, CTA до friends, manual QA scan/CSV.
+- Оновити roadmap status, functional specification, user guide/API inventory та
+  known limitations за фактичною реалізацією.
+- **DoD:** progress 0/1/9/10+, repeat/import refresh і empty/error states tested;
+  funnel report відрізняє MANUAL/BARCODE/CSV; усі Stage 8 acceptance criteria green.
+
+## 7. Наскрізна test matrix і release gate
+
+- Shared: valid/invalid boundaries, DTO parity, exact template/header.
+- API: positive, negative, permission, idempotency, concurrency, transaction
+  rollback, query-count і provider timeout tests.
+- Web: route server/client boundary, forms, scanner cleanup, CSV resolution,
+  retry/empty/error, accessibility names і focus restoration.
+- E2E: manual add → repeat; scan → lookup → Copy; CSV preview → resolve → commit →
+  safe rerun; correction creator/owner/stranger; 10th book → friends CTA.
+- Build evidence: scan dependency відсутня в initial catalog/new chunk; camera code
+  не виконується на server; `docs/specification.md` не змінений.
+
+Stage 8 завершено лише коли всі підетапи merged, root gate green, production-like
+migration і manual camera matrix пройдені, а docs описують фактичну поведінку.
+
+## 8. Явне «Не робити»
+
+- Shelf photo, OCR/AI cover recognition, native app, Goodreads sync.
+- Title-only CSV, довільне зіставлення колонок, XLSX/Google Sheets integration,
+  background jobs або distributed import queue.
+- Public catalog edit, admin console, moderation workflow, delete/merge з edit UI.
+- Camera frame upload/storage, ISBN lookup на client, довіра до client validation.
+- CSV export; коли він з'явиться на Етапі 13, окремо neutralize formula prefixes
+  (`=`, `+`, `-`, `@`) за правилами CSV injection defense.
+- Invite links і aggregated friend discovery — Етап 9.
+- Ratings/reviews — відкладені після Public v1 окремим PO-рішенням.
+
+## 9. Research basis
+
+- MDN: `getUserMedia` потребує secure context і явного дозволу; `facingMode`
+  `environment` просить задню камеру.
+- MDN: `BarcodeDetector` — experimental/limited availability, тому потрібен
+  library fallback, а не залежність від native API.
+- `@zxing/browser`: підтримує decode із camera constraints та явний stop control.
+- Open Library Books API підтримує кілька `bibkeys` в одному запиті; актуальні
+  usage guidelines вимагають кеш, identified `User-Agent` і застерігають від
+  сотень single-book requests.
+- RFC 4180 задає базову CSV форму; `csv-parse` підтримує BOM, strict column count
+  і record-size limits.
+- OWASP CSV Injection: імпортований текст не виконується; майбутній export має
+  neutralize formula-leading cells.
+
+Посилання:
+
+- <https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia>
+- <https://developer.mozilla.org/en-US/docs/Web/API/MediaTrackConstraints/facingMode>
+- <https://developer.mozilla.org/en-US/docs/Web/API/BarcodeDetector/detect>
+- <https://github.com/zxing-js/browser>
+- <https://openlibrary.org/dev/docs/api/books>
+- <https://openlibrary.org/developers/api>
+- <https://datatracker.ietf.org/doc/html/rfc4180>
+- <https://csv.js.org/parse/options/>
+- <https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/21-Testing_for_CSV_Injection/>

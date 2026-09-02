@@ -70,7 +70,8 @@ private beta для кожного переходу фіксується фак�
 ### Етап 8 — activation і вимірювання
 
 **Статус:** у роботі; product analytics завершено, inventory activation
-залишається наступним пріоритетом.
+залишається наступним пріоритетом. Детальна послідовність і відкриті рішення
+зафіксовані в [execution plan 8b–8h](./stage-8-inventory.md).
 
 **Мета:** користувач отримує usable library за перші хвилини, а команда бачить,
 де саме він зупиняється.
@@ -286,8 +287,9 @@ Bayesian score, global prior і recompute CLI. Наявні поля БД не �
 
 До відповідного execution plan треба затвердити:
 
-- **Етап 8:** права на виправлення спільного каталогу; точний CSV format.
-  Storage і тимчасове retention-рішення для product events вже затверджено в
+- **Етап 8:** права на виправлення спільного каталогу й точний CSV format
+  затверджено в [execution plan 8b–8h](./stage-8-inventory.md). Storage і тимчасове
+  retention-рішення для product events затверджено в
   [execution plan 8a](./stage-8-activation.md); остаточний retention входить до
   рішення про account deletion на Етапі 13.
 - **Етап 9:** строк дії/revoke invite; чи можна запрошувати кількох людей одним

@@ -4,6 +4,9 @@
 
 - [Product Roadmap v2](./roadmap-v2.md) — **єдине активне джерело пріоритетів і
   порядку наступних робіт**.
+- [Етап 8b–8h — inventory activation](./stage-8-inventory.md) — затверджений
+  execution plan для barcode/camera scan, CSV import, repeat-add, виправлення
+  metadata й onboarding до перших 10 книг.
 - Перед початком кожного етапу з roadmap для нього створюється окремий execution
   plan із технічними рішеннями, підетапами й Definition of done.
 
