@@ -7,6 +7,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main",
+    "funnel:report": "pnpm run build && node dist/cli/funnel-report.js",
     "merge:works": "pnpm run build && node dist/cli/merge-works.js",
     "generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
