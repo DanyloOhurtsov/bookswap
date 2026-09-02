@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import {
   CONDITION,
   EDITION_FORMAT,
@@ -33,14 +33,23 @@ import {
 import { AuthorLine, EditionLine } from '@/components/BookParts'
 import { TextField, SelectField, TextAreaField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
+import {
+  AddBookShell,
+  LanguageField,
+  completeAddBook,
+  continueAfterEdition,
+  continueAfterTranslation,
+  continueAfterWork,
+  createSearchStep,
+  selectExistingEdition,
+  selectExistingWork,
+  startNewWork,
+  type AddBookStep,
+  type AuthorEntry,
+} from '@/features/catalog/add-book/index.client'
 import { ApiRequestError, apiRequest, describeError } from '../../../lib/api'
 import { describeAddBookError } from '../../../lib/catalog-errors'
-import {
-  CONDITION_LABELS,
-  EDITION_FORMAT_LABELS,
-  LANGUAGE_HINTS,
-  VISIBILITY_LABELS,
-} from '../../../lib/labels'
+import { CONDITION_LABELS, EDITION_FORMAT_LABELS, VISIBILITY_LABELS } from '../../../lib/labels'
 import { mapLookupResultToDraft } from '../../../lib/lookup-mapping'
 import { useSession } from '../../../lib/use-session'
 import { validate, type FieldErrors } from '../../../lib/validation'
@@ -82,49 +91,13 @@ export default function NewBookPage() {
   )
 }
 
-interface AuthorEntry {
-  key: string
-  name: string
-  /** Проставляється лише вибором зі списку наявних — не збігом імені. */
-  authorId?: string
-  role: AuthorRole
-}
-
-type Step =
-  | { kind: 'search' }
-  | { kind: 'work'; initialTitle: string; isbn?: string; lookup?: BookLookupResult }
-  | {
-      kind: 'translation'
-      workId: string
-      title: string
-      isbn?: string
-      lookup?: BookLookupResult
-      /**
-       * Лише в гілці «наявний Work» (Етап 7c/7d, п.12): переклади, які вже є
-       * в цього твору — щоб не заводити дублікат `Translation`, коли підходить
-       * наявний. У гілці «нічого не знайдено» Work щойно створений, тож тут
-       * завжди `undefined`.
-       */
-      existingTranslations?: Translation[]
-    }
-  | {
-      kind: 'edition'
-      workId: string
-      title: string
-      translationId: string | null
-      isbn?: string
-      lookup?: BookLookupResult
-    }
-  | { kind: 'copy'; workId: string; title: string; editionId: string }
-  | { kind: 'done'; workId: string; title: string }
-
 function Wizard() {
   const router = useRouter()
   const parameters = useSearchParams()
   const { state: session } = useSession()
   const presetWorkId = parameters.get('workId')
 
-  const [step, setStep] = useState<Step>({ kind: 'search' })
+  const [step, setStep] = useState<AddBookStep>(createSearchStep)
   const [failure, setFailure] = useState<unknown>()
 
   useEffect(() => {
@@ -144,7 +117,7 @@ function Wizard() {
           signal: controller.signal,
         })
 
-        setStep({ kind: 'translation', workId: detail.work.id, title: detail.work.title })
+        setStep(selectExistingWork({ workId: detail.work.id, title: detail.work.title }))
       } catch (error) {
         if (controller.signal.aborted) return
 
@@ -161,35 +134,35 @@ function Wizard() {
 
   if (session.status === 'loading') {
     return (
-      <Shell step={step}>
+      <AddBookShell step={step}>
         <p className="status status--pending">Перевіряю сесію…</p>
-      </Shell>
+      </AddBookShell>
     )
   }
 
   if (session.status !== 'authenticated') {
     return (
-      <Shell step={step}>
+      <AddBookShell step={step}>
         <p className="status status--pending">Потрібен вхід. Переадресовую…</p>
-      </Shell>
+      </AddBookShell>
     )
   }
 
   return (
-    <Shell step={step}>
+    <AddBookShell step={step}>
       <FormStatus error={failure} />
 
       {step.kind === 'search' && (
         <SearchStep
           initialQuery={parameters.get('q') ?? ''}
           onFoundEdition={(workId, title, editionId) => {
-            setStep({ kind: 'copy', workId, title, editionId })
+            setStep(selectExistingEdition({ workId, title, editionId }))
           }}
           onFoundWork={(workId, title, isbn, lookup, existingTranslations) => {
-            setStep({ kind: 'translation', workId, title, isbn, lookup, existingTranslations })
+            setStep(selectExistingWork({ workId, title, isbn, lookup, existingTranslations }))
           }}
           onCreateNew={(initialTitle, isbn, lookup) => {
-            setStep({ kind: 'work', initialTitle, isbn, lookup })
+            setStep(startNewWork({ initialTitle, isbn, lookup }))
           }}
         />
       )}
@@ -199,7 +172,7 @@ function Wizard() {
           initialTitle={step.initialTitle}
           lookup={step.lookup}
           onCreated={(workId, title) => {
-            setStep({ kind: 'translation', workId, title, isbn: step.isbn, lookup: step.lookup })
+            setStep(continueAfterWork(step, { workId, title }))
           }}
         />
       )}
@@ -210,14 +183,7 @@ function Wizard() {
           lookup={step.lookup}
           existingTranslations={step.existingTranslations}
           onDone={(translationId) => {
-            setStep({
-              kind: 'edition',
-              workId: step.workId,
-              title: step.title,
-              translationId,
-              isbn: step.isbn,
-              lookup: step.lookup,
-            })
+            setStep(continueAfterTranslation(step, translationId))
           }}
         />
       )}
@@ -229,7 +195,7 @@ function Wizard() {
           lookup={step.lookup}
           initialIsbn={step.isbn}
           onCreated={(editionId) => {
-            setStep({ kind: 'copy', workId: step.workId, title: step.title, editionId })
+            setStep(continueAfterEdition(step, editionId))
           }}
         />
       )}
@@ -238,7 +204,7 @@ function Wizard() {
         <CopyStep
           editionId={step.editionId}
           onDone={() => {
-            setStep({ kind: 'done', workId: step.workId, title: step.title })
+            setStep(completeAddBook(step))
           }}
         />
       )}
@@ -255,71 +221,7 @@ function Wizard() {
           </p>
         </>
       )}
-    </Shell>
-  )
-}
-
-/**
- * Без «крок X із N»: залежно від гілки (наявне видання / наявний твір / нічого
- * не знайдено) шлях має різну довжину, і фіксований лічильник брехав би на
- * коротких гілках.
- */
-const STEP_TITLES: Readonly<Record<Step['kind'], string>> = {
-  search: 'Пошук у каталозі',
-  work: 'Твір',
-  translation: 'Переклад',
-  edition: 'Видання',
-  copy: 'Ваш примірник',
-  done: 'Готово',
-}
-
-function Shell({ step, children }: { step: Step; children: ReactNode }) {
-  return (
-    <main className="page">
-      <h1>Додати книжку</h1>
-      <p className="lede">{STEP_TITLES[step.kind]}</p>
-      {children}
-    </main>
-  )
-}
-
-function LanguageField({
-  id,
-  label,
-  hint,
-  value,
-  error,
-  onChange,
-}: {
-  id: string
-  label: string
-  hint?: string
-  value: string
-  error?: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <>
-      <TextField
-        id={id}
-        label={label}
-        hint={hint ?? 'Код ISO 639-1: uk, en, pl…'}
-        list="language-hints"
-        autoComplete="off"
-        value={value}
-        error={error}
-        onChange={(event) => {
-          onChange(event.target.value)
-        }}
-      />
-      <datalist id="language-hints">
-        {LANGUAGE_HINTS.map((language) => (
-          <option key={language.code} value={language.code}>
-            {language.label}
-          </option>
-        ))}
-      </datalist>
-    </>
+    </AddBookShell>
   )
 }
 
