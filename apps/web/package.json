@@ -6,7 +6,7 @@
     "build": "next build",
     "dev": "next dev --port 3000",
     "start": "next start --port 3000",
-    "lint": "eslint app components lib next.config.ts --max-warnings=0",
+    "lint": "eslint app components features lib next.config.ts --max-warnings=0",
     "test": "jest",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "clean": "rimraf .next .turbo *.tsbuildinfo"
