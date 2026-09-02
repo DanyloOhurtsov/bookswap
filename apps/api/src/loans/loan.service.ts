@@ -12,6 +12,8 @@ import {
 } from '@bookswap/shared'
 import { AccessService, blocked } from '../access/access.service'
 import { copyVisibleTo } from '../access/visibility'
+import { AnalyticsService } from '../analytics/analytics.service'
+import type { ProductEventType } from '../analytics/product-event.types'
 import { ApiException } from '../common/api.exception'
 import { isUniqueViolationOn } from '../common/prisma-errors'
 import { NotificationsService } from '../notifications/notifications.service'
@@ -72,6 +74,17 @@ interface TransitionOutcome {
   rejectedRivalIds: string[]
 }
 
+type LoanProductEventType = Extract<
+  ProductEventType,
+  'LOAN_APPROVED' | 'LOAN_HANDED_OVER' | 'LOAN_RETURNED'
+>
+
+const LOAN_EVENT_BY_STATUS: Partial<Record<LoanStatus, LoanProductEventType>> = {
+  APPROVED: 'LOAN_APPROVED',
+  HANDED_OVER: 'LOAN_HANDED_OVER',
+  RETURNED: 'LOAN_RETURNED',
+}
+
 /**
  * §5. Єдине місце, де змінюється `Loan.status`.
  *
@@ -88,6 +101,7 @@ export class LoanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly analytics: AnalyticsService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -239,6 +253,13 @@ export class LoanService {
     // на рядки, яких ще ніхто, крім цієї транзакції, не бачить.
     this.notifications.dispatchSoon()
 
+    await this.analytics.record({
+      type: 'LOAN_REQUESTED',
+      subjectUserId: loan.borrowerId,
+      domainEntityId: loan.id,
+      properties: {},
+    })
+
     return { loan: toLoan(loan) }
   }
 
@@ -286,6 +307,17 @@ export class LoanService {
     // §7.3: «після коміту: подія». Один поштовх на весь перехід — авто-відхилення
     // конкурентів могло створити ще кілька сповіщень, і всі вони вже в базі.
     this.notifications.dispatchSoon()
+
+    const productEventType = LOAN_EVENT_BY_STATUS[outcome.to]
+
+    if (productEventType !== undefined) {
+      await this.analytics.record({
+        type: productEventType,
+        subjectUserId: outcome.loan.borrower.id,
+        domainEntityId: outcome.loan.id,
+        properties: {},
+      })
+    }
 
     return { loan: toLoan(outcome.loan) }
   }

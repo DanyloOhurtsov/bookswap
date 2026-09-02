@@ -7,6 +7,7 @@ import {
   type FriendRequestsResponse,
 } from '@bookswap/shared'
 import { AccessService, blocked, type FriendshipReader } from '../access/access.service'
+import { AnalyticsService } from '../analytics/analytics.service'
 import {
   actorRoleOf,
   isMember,
@@ -42,6 +43,11 @@ import type { FriendshipModel } from '../generated/prisma/models'
 export type FriendshipTarget =
   { kind: 'user'; userId: string } | { kind: 'request'; requestId: string }
 
+interface FriendshipTransitionOutcome {
+  relation: FriendRelation
+  accepted: { friendshipId: string; userAId: string; userBId: string } | null
+}
+
 /** Обидва учасники потрібні для §9-проєкції в списках. */
 const WITH_USERS = {
   userA: { select: PUBLIC_USER_FIELDS },
@@ -63,6 +69,7 @@ export class FriendsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    private readonly analytics: AnalyticsService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -160,20 +167,31 @@ export class FriendsService {
     target: FriendshipTarget,
     action: FriendshipAction,
   ): Promise<FriendRelation> {
-    const relation = await this.runWithRetry(actorId, target, action)
+    const outcome = await this.runWithRetry(actorId, target, action)
 
     // §7.3: «після коміту: подія». Тут, а не всередині транзакції: поштовх,
     // надісланий звідти, розбудив би диспетчер на рядки, яких ще не видно.
     this.notifications.dispatchSoon()
 
-    return relation
+    if (outcome.accepted !== null) {
+      for (const subjectUserId of [outcome.accepted.userAId, outcome.accepted.userBId]) {
+        await this.analytics.record({
+          type: 'FRIEND_ACCEPTED',
+          subjectUserId,
+          domainEntityId: outcome.accepted.friendshipId,
+          properties: {},
+        })
+      }
+    }
+
+    return outcome.relation
   }
 
   private async runWithRetry(
     actorId: string,
     target: FriendshipTarget,
     action: FriendshipAction,
-  ): Promise<FriendRelation> {
+  ): Promise<FriendshipTransitionOutcome> {
     try {
       return await this.runTransition(actorId, target, action)
     } catch (error) {
@@ -225,7 +243,7 @@ export class FriendsService {
     actorId: string,
     target: FriendshipTarget,
     action: FriendshipAction,
-  ): Promise<FriendRelation> {
+  ): Promise<FriendshipTransitionOutcome> {
     return this.prisma.$transaction(async (tx) => {
       const { friendship, otherId } = await this.locate(actorId, target, tx)
       const outcome = resolveTransition(
@@ -253,7 +271,7 @@ export class FriendsService {
 
         await this.notify(tx, created, actorId)
 
-        return relationOf(created, actorId)
+        return { relation: relationOf(created, actorId), accepted: null }
       }
 
       // Сюди можна дійти лише з наявного стану, тобто рядок є. Перевірка потрібна
@@ -268,7 +286,7 @@ export class FriendsService {
 
         this.assertSingleRow(deleted.count)
 
-        return 'NONE'
+        return { relation: 'NONE', accepted: null }
       }
 
       const after: FriendshipRecord = {
@@ -297,7 +315,17 @@ export class FriendsService {
 
       await this.notify(tx, { ...friendship, ...after }, actorId)
 
-      return relationOf(after, actorId)
+      return {
+        relation: relationOf(after, actorId),
+        accepted:
+          after.status === 'ACCEPTED'
+            ? {
+                friendshipId: friendship.id,
+                userAId: friendship.userAId,
+                userBId: friendship.userBId,
+              }
+            : null,
+      }
     })
   }
 
