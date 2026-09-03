@@ -21,6 +21,7 @@ import { mapLookupResultToDraft } from '@/app/lib/lookup-mapping'
 import { TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { LanguageField } from './LanguageField'
+import { nullableNumber } from '../model/form-values'
 
 type TranslationStepProps = {
   workId: string
@@ -38,10 +39,6 @@ type TranslationFieldsProps = {
   control: Control<CreateTranslationRequest>
   errors: FieldErrors<CreateTranslationRequest>
   register: UseFormRegister<CreateTranslationRequest>
-}
-
-function nullableNumber(value: unknown): unknown {
-  return value === '' || value === null || value === undefined ? null : Number(value)
 }
 
 function defaultValues(translationLang: string | undefined): CreateTranslationRequest {
