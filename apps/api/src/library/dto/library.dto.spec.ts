@@ -44,6 +44,7 @@ describe('AddCopyDto ↔ addCopyRequestSchema', () => {
           note: 'пляма',
           visibility: 'PRIVATE',
           acquiredAt: '2026-03-01',
+          entryMethod: 'BARCODE',
         },
         valid: true,
       },
@@ -53,6 +54,11 @@ describe('AddCopyDto ↔ addCopyRequestSchema', () => {
       {
         name: 'невідома видимість',
         payload: { editionId: 'e-1', visibility: 'SECRET' },
+        valid: false,
+      },
+      {
+        name: 'невідомий спосіб додавання',
+        payload: { editionId: 'e-1', entryMethod: 'CSV' },
         valid: false,
       },
       { name: 'нотатку прибрано null', payload: { editionId: 'e-1', note: null }, valid: true },

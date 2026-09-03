@@ -7,18 +7,22 @@ import {
   addCopyRequestSchema,
   copyResponseSchema,
   type AddCopyRequest,
+  type CopyEntryMethod,
 } from '@bookswap/shared'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { ApiRequestError, apiRequest, describeError } from '@/app/lib/api'
 import { CONDITION_LABELS, VISIBILITY_LABELS } from '@/app/lib/labels'
 import { SelectField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { nullableText } from '../model/form-values'
+import { DEFAULT_COPY_DEFAULTS, type CopyDefaults } from '../model/copy-defaults'
 
 type CopyStepProps = {
   editionId: string
-  onDone: () => void
+  defaults?: CopyDefaults
+  entryMethod?: CopyEntryMethod
+  onDone: (defaults: CopyDefaults) => void
 }
 
 type CopyFieldsProps = {
@@ -26,13 +30,18 @@ type CopyFieldsProps = {
   register: UseFormRegister<AddCopyRequest>
 }
 
-function defaultValues(editionId: string): AddCopyRequest {
+function defaultValues(
+  editionId: string,
+  defaults: CopyDefaults,
+  entryMethod: CopyEntryMethod,
+): AddCopyRequest {
   return {
     editionId,
-    condition: 'GOOD',
-    visibility: 'FRIENDS',
+    condition: defaults.condition,
+    visibility: defaults.visibility,
     note: null,
     acquiredAt: null,
+    entryMethod,
   }
 }
 
@@ -71,18 +80,27 @@ function CopyFields({ errors, register }: CopyFieldsProps) {
   )
 }
 
-export function CopyStep({ editionId, onDone }: CopyStepProps) {
+export function CopyStep({
+  editionId,
+  defaults = DEFAULT_COPY_DEFAULTS,
+  entryMethod = 'MANUAL',
+  onDone,
+}: CopyStepProps) {
   const [failure, setFailure] = useState<unknown>()
+  const isSubmissionLocked = useRef(false)
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<AddCopyRequest>({
     resolver: zodResolver(addCopyRequestSchema),
-    defaultValues: defaultValues(editionId),
+    defaultValues: defaultValues(editionId, defaults, entryMethod),
   })
 
   async function submit(request: AddCopyRequest): Promise<void> {
+    if (isSubmissionLocked.current) return
+
+    isSubmissionLocked.current = true
     setFailure(undefined)
 
     try {
@@ -91,15 +109,21 @@ export function CopyStep({ editionId, onDone }: CopyStepProps) {
         body: request,
         schema: copyResponseSchema,
       })
-      onDone()
+      onDone({
+        condition: request.condition ?? DEFAULT_COPY_DEFAULTS.condition,
+        visibility: request.visibility ?? DEFAULT_COPY_DEFAULTS.visibility,
+      })
     } catch (error) {
       setFailure(error instanceof ApiRequestError ? error : new Error(describeError(error)))
+    } finally {
+      isSubmissionLocked.current = false
     }
   }
 
   return (
     <form className="form" onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
       <FormStatus error={failure} />
+      <input type="hidden" {...register('entryMethod')} />
       <CopyFields errors={errors} register={register} />
       <button type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Додаю…' : 'Додати до бібліотеки'}

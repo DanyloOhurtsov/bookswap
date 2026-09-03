@@ -36,9 +36,11 @@ jest.mock('@/app/lib/use-session', () => ({
 }))
 
 let searchParams = new URLSearchParams()
+const push = jest.fn()
+const replace = jest.fn()
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push, replace }),
   useSearchParams: () => searchParams,
 }))
 
@@ -122,6 +124,8 @@ function routeApiRequest(handlers: Record<string, (options: { body?: unknown }) 
 beforeEach(() => {
   searchParams = new URLSearchParams()
   mockApiRequest.mockReset()
+  push.mockReset()
+  replace.mockReset()
 })
 
 async function search(query: string): Promise<void> {
@@ -180,9 +184,136 @@ describe('гілка «наявне Edition»', () => {
     })
 
     expect(await screen.findByText(/тепер у вашій бібліотеці/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ще один такий примірник' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Додати наступну книгу' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Сканувати наступну' })).toBeInTheDocument()
 
     // Жодного кроку створення Work/Translation/Edition не було.
     expect(mockApiRequest).not.toHaveBeenCalledWith('/works', expect.anything())
+  })
+})
+
+describe('швидке послідовне додавання', () => {
+  it('adds another Copy for the same Edition and keeps only safe session defaults', async () => {
+    const copyBodies: unknown[] = []
+    let searchCount = 0
+    routeApiRequest({
+      '/catalog/search/candidates': () => {
+        searchCount += 1
+
+        return {
+          candidates: [
+            searchCount === 1
+              ? candidate({ editions: [edition({ id: 'edition-repeat' })] })
+              : candidate({
+                  work: work({ id: 'work-next', title: 'Місто' }),
+                  editions: [edition({ id: 'edition-next', workId: 'work-next' })],
+                }),
+          ],
+        }
+      },
+      '/me/library': ({ body }) => {
+        copyBodies.push(body)
+        return undefined
+      },
+    })
+
+    await search('Кобзар')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+    await user.selectOptions(screen.getByLabelText('Стан примірника'), 'WORN')
+    await user.selectOptions(screen.getByLabelText('Кому показувати'), 'PRIVATE')
+    await user.type(screen.getByLabelText('Нотатка'), 'Лише для першого')
+    await user.type(screen.getByLabelText('Коли зʼявилася'), '2026-09-01')
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Ще один такий примірник' }))
+
+    expect(screen.getByLabelText('Стан примірника')).toHaveValue('WORN')
+    expect(screen.getByLabelText('Кому показувати')).toHaveValue('PRIVATE')
+    expect(screen.getByLabelText('Нотатка')).toHaveValue('')
+    expect(screen.getByLabelText('Коли зʼявилася')).toHaveValue('')
+
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+    await screen.findByText(/тепер у вашій бібліотеці/)
+
+    expect(copyBodies).toEqual([
+      {
+        editionId: 'edition-repeat',
+        condition: 'WORN',
+        visibility: 'PRIVATE',
+        note: 'Лише для першого',
+        acquiredAt: '2026-09-01',
+        entryMethod: 'MANUAL',
+      },
+      {
+        editionId: 'edition-repeat',
+        condition: 'WORN',
+        visibility: 'PRIVATE',
+        note: null,
+        acquiredAt: null,
+        entryMethod: 'MANUAL',
+      },
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Додати наступну книгу' }))
+    expect(push).toHaveBeenCalledWith('/catalog/new')
+    const nextSearch = await screen.findByLabelText('Назва або ISBN')
+    expect(nextSearch).toHaveValue('')
+
+    await user.type(nextSearch, 'Місто')
+    await user.click(screen.getByRole('button', { name: 'Шукати' }))
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+
+    expect(screen.getByLabelText('Стан примірника')).toHaveValue('WORN')
+    expect(screen.getByLabelText('Кому показувати')).toHaveValue('PRIVATE')
+    expect(screen.getByLabelText('Нотатка')).toHaveValue('')
+    expect(screen.getByLabelText('Коли зʼявилася')).toHaveValue('')
+
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+    await screen.findByText(/«Місто» тепер у вашій бібліотеці/)
+
+    expect(copyBodies[2]).toEqual({
+      editionId: 'edition-next',
+      condition: 'WORN',
+      visibility: 'PRIVATE',
+      note: null,
+      acquiredAt: null,
+      entryMethod: 'MANUAL',
+    })
+  })
+
+  it('opens the scanner entry URL and starts with a clean search', async () => {
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [candidate({ editions: [edition({ id: 'edition-scan-next' })] })],
+      }),
+      '/me/library': () => undefined,
+    })
+
+    await search('Кобзар')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+    await user.click(await screen.findByRole('button', { name: 'Сканувати наступну' }))
+
+    expect(push).toHaveBeenCalledWith('/catalog/new?mode=scan')
+    expect(await screen.findByLabelText('Назва або ISBN')).toHaveValue('')
+  })
+
+  it('remounts clean search state when URL history changes', async () => {
+    searchParams = new URLSearchParams('q=Кобзар')
+    const { rerender } = render(<AddBookWizard />)
+
+    expect(await screen.findByLabelText('Назва або ISBN')).toHaveValue('Кобзар')
+
+    searchParams = new URLSearchParams()
+    rerender(<AddBookWizard />)
+    expect(screen.getByLabelText('Назва або ISBN')).toHaveValue('')
+
+    searchParams = new URLSearchParams('q=Кобзар')
+    rerender(<AddBookWizard />)
+    expect(screen.getByLabelText('Назва або ISBN')).toHaveValue('Кобзар')
   })
 })
 

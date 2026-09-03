@@ -53,6 +53,16 @@ describe('addCopyRequestSchema', () => {
         .success,
     ).toBe(false)
   })
+
+  it.each(['MANUAL', 'BARCODE'] as const)('приймає entryMethod=%s', (entryMethod) => {
+    expect(addCopyRequestSchema.parse({ editionId: 'e-1', entryMethod }).entryMethod).toBe(
+      entryMethod,
+    )
+  })
+
+  it.each(['CSV', 'OCR'])('відхиляє client entryMethod=%s', (entryMethod) => {
+    expect(addCopyRequestSchema.safeParse({ editionId: 'e-1', entryMethod }).success).toBe(false)
+  })
 })
 
 describe('updateCopyRequestSchema', () => {

@@ -194,7 +194,7 @@ export class LibraryService {
   }
 
   /**
-   * §8: `POST /me/library { editionId, condition, note, visibility }`.
+   * §8: `POST /me/library { editionId, condition, note, visibility, entryMethod? }`.
    *
    * `currentHolderId = ownerId` — книжка вдома, тобто інваріант §5.3.2 виконано
    * від народження примірника.
@@ -224,7 +224,7 @@ export class LibraryService {
       type: 'BOOK_ADDED',
       subjectUserId: userId,
       domainEntityId: copy.id,
-      properties: { method: 'MANUAL' },
+      properties: { method: request.entryMethod ?? 'MANUAL' },
     })
 
     return { copy: toOwnCopy(copy) }

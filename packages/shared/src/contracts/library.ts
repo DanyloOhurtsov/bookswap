@@ -23,6 +23,12 @@ export const LIBRARY_LIMITS = {
   queryMax: 200,
 } as const
 
+export const COPY_ENTRY_METHOD = ['MANUAL', 'BARCODE'] as const
+
+export const copyEntryMethodSchema = z.enum(COPY_ENTRY_METHOD)
+
+export type CopyEntryMethod = z.infer<typeof copyEntryMethodSchema>
+
 const idSchema = z.string().trim().min(1).max(LIBRARY_LIMITS.idMax)
 
 const noteSchema = z.string().trim().max(LIBRARY_LIMITS.noteMax)
@@ -243,10 +249,11 @@ export const libraryQueryRequestSchema = z.object({
 export type LibraryQueryRequest = z.infer<typeof libraryQueryRequestSchema>
 
 /**
- * §8: `POST /me/library { editionId, condition, note, visibility }`.
+ * §8: `POST /me/library { editionId, condition, note, visibility, entryMethod? }`.
  *
  * Кожен фізичний примірник — окремий рядок, тож поля «скільки» тут немає й бути
- * не може (§3). Два однакові томи — два запити.
+ * не може (§3). Два однакові томи — два запити. `entryMethod` класифікує канал
+ * активації для аналітики й не впливає на permission-рішення.
  */
 export const addCopyRequestSchema = z.object({
   editionId: idSchema,
@@ -254,6 +261,7 @@ export const addCopyRequestSchema = z.object({
   note: noteSchema.nullable().optional(),
   visibility: visibilitySchema.optional(),
   acquiredAt: dateOnlySchema.nullable().optional(),
+  entryMethod: copyEntryMethodSchema.optional(),
 })
 
 export type AddCopyRequest = z.infer<typeof addCopyRequestSchema>

@@ -184,12 +184,14 @@ export {
   type WorkMergedDetails,
 } from './contracts/catalog'
 export {
+  COPY_ENTRY_METHOD,
   LIBRARY_LIMITS,
   addCopyRequestSchema,
   borrowedCopySchema,
   borrowedLibraryGroupSchema,
   borrowedLibraryResponseSchema,
   copyResponseSchema,
+  copyEntryMethodSchema,
   libraryCountsSchema,
   libraryGroupSchema,
   libraryQueryRequestSchema,
@@ -202,6 +204,7 @@ export {
   visibleLibraryGroupSchema,
   visibleLibraryResponseSchema,
   type AddCopyRequest,
+  type CopyEntryMethod,
   type BorrowedCopy,
   type BorrowedLibraryGroup,
   type BorrowedLibraryResponse,
