@@ -108,6 +108,24 @@ describe('Auth and library product analytics (e2e)', () => {
     )
   })
 
+  it('records BOOK_ADDED with the BARCODE method supplied by the add-copy flow', async () => {
+    const account = await register(app, 'analytics-barcode-book')
+    const editionId = await createEdition(prisma, account.id)
+
+    const response = await request(app.getHttpServer())
+      .post(url('/me/library'))
+      .set('Cookie', account.cookie)
+      .send({ editionId, entryMethod: 'BARCODE' })
+      .expect(201)
+    const copyId = copyResponseSchema.parse(response.body).copy.id
+
+    const event = await prisma.productEvent.findUniqueOrThrow({
+      where: { dedupeKey: computeDedupeKey('BOOK_ADDED', copyId, account.id) },
+    })
+
+    expect(event.properties).toEqual({ method: 'BARCODE' })
+  })
+
   it('keeps registration successful when analytics storage fails', async () => {
     const createMany = jest
       .spyOn(prisma.productEvent, 'createMany')

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { workDetailResponseSchema } from '@bookswap/shared'
@@ -13,12 +12,16 @@ import {
   continueAfterTranslation,
   continueAfterWork,
   createSearchStep,
+  repeatSameEdition,
   selectExistingEdition,
   selectExistingWork,
   startNewWork,
   type AddBookStep,
 } from '../model/add-book-step'
+import { readAddBookEntryMode } from '../model/add-book-entry-mode'
+import { DEFAULT_COPY_DEFAULTS, type CopyDefaults } from '../model/copy-defaults'
 import { AddBookShell } from './AddBookShell'
+import { AddBookSuccess } from './AddBookSuccess'
 import { CopyStep } from './CopyStep'
 import { EditionStep } from './EditionStep'
 import { SearchStep } from './SearchStep'
@@ -36,8 +39,11 @@ export function AddBookWizard() {
   const parameters = useSearchParams()
   const { state: session } = useSession()
   const presetWorkId = parameters.get('workId')
+  const initialQuery = parameters.get('q') ?? ''
+  const entryMode = readAddBookEntryMode(parameters.get('mode'))
 
   const [step, setStep] = useState<AddBookStep>(createSearchStep)
+  const [copyDefaults, setCopyDefaults] = useState<CopyDefaults>(DEFAULT_COPY_DEFAULTS)
   const [failure, setFailure] = useState<unknown>()
 
   useEffect(() => {
@@ -94,7 +100,8 @@ export function AddBookWizard() {
 
       {step.kind === 'search' && (
         <SearchStep
-          initialQuery={parameters.get('q') ?? ''}
+          key={`${entryMode}:${initialQuery}`}
+          initialQuery={initialQuery}
           onFoundEdition={(selection) => {
             setStep(selectExistingEdition(selection))
           }}
@@ -143,23 +150,33 @@ export function AddBookWizard() {
       {step.kind === 'copy' && (
         <CopyStep
           editionId={step.editionId}
-          onDone={() => {
+          defaults={copyDefaults}
+          entryMethod="MANUAL"
+          onDone={(nextDefaults) => {
+            setCopyDefaults(nextDefaults)
             setStep(completeAddBook(step))
           }}
         />
       )}
 
       {step.kind === 'done' && (
-        <>
-          <div className="alert alert--ok" role="status">
-            <p>«{step.title}» тепер у вашій бібліотеці.</p>
-          </div>
-          <p className="form__aside">
-            <Link href="/library">До бібліотеки</Link> ·{' '}
-            <Link href={`/works/${step.workId}`}>Сторінка твору</Link> ·{' '}
-            <Link href="/catalog">Шукати далі</Link>
-          </p>
-        </>
+        <AddBookSuccess
+          title={step.title}
+          workId={step.workId}
+          onRepeatEdition={() => {
+            setStep(repeatSameEdition(step))
+          }}
+          onAddNext={() => {
+            setFailure(undefined)
+            setStep(createSearchStep())
+            router.push('/catalog/new')
+          }}
+          onScanNext={() => {
+            setFailure(undefined)
+            setStep(createSearchStep())
+            router.push('/catalog/new?mode=scan')
+          }}
+        />
       )}
     </AddBookShell>
   )

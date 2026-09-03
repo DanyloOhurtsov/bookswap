@@ -2,11 +2,13 @@ import { Transform } from 'class-transformer'
 import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import {
   CONDITION,
+  COPY_ENTRY_METHOD,
   COPY_STATUS,
   LIBRARY_LIMITS,
   OWNER_COPY_STATUS,
   VISIBILITY,
   type Condition,
+  type CopyEntryMethod,
   type CopyStatus,
   type OwnerCopyStatus,
   type Visibility,
@@ -62,6 +64,10 @@ export class AddCopyDto {
   @IsOptional()
   @IsIsoDate()
   acquiredAt?: string | null
+
+  @IsOptional()
+  @IsIn(COPY_ENTRY_METHOD, { message: 'Невідомий спосіб додавання примірника' })
+  entryMethod?: CopyEntryMethod
 }
 
 /**

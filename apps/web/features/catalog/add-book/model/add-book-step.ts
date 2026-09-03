@@ -34,7 +34,7 @@ type CopyStep = {
   editionId: string
 }
 
-type DoneStep = { kind: 'done'; workId: string; title: string }
+type DoneStep = { kind: 'done'; workId: string; title: string; editionId: string }
 
 export type AddBookStep =
   SearchStep | WorkStep | TranslationStep | EditionStep | CopyStep | DoneStep
@@ -88,5 +88,19 @@ export function continueAfterEdition(step: EditionStep, editionId: string): Copy
 }
 
 export function completeAddBook(step: CopyStep): DoneStep {
-  return { kind: 'done', workId: step.workId, title: step.title }
+  return {
+    kind: 'done',
+    workId: step.workId,
+    title: step.title,
+    editionId: step.editionId,
+  }
+}
+
+export function repeatSameEdition(step: DoneStep): CopyStep {
+  return {
+    kind: 'copy',
+    workId: step.workId,
+    title: step.title,
+    editionId: step.editionId,
+  }
 }

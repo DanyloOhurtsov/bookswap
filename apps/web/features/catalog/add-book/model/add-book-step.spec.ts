@@ -5,6 +5,7 @@ import {
   continueAfterTranslation,
   continueAfterWork,
   createSearchStep,
+  repeatSameEdition,
   selectExistingEdition,
   selectExistingWork,
   startNewWork,
@@ -40,7 +41,15 @@ describe('add-book wizard transitions', () => {
 
     expect(translationStep).toMatchObject({ isbn: '9783161484100', lookup })
     expect(editionStep).toMatchObject({ isbn: '9783161484100', lookup })
-    expect(completeAddBook(copyStep)).toEqual({ kind: 'done', workId: 'work-1', title: 'Book' })
+    const doneStep = completeAddBook(copyStep)
+
+    expect(doneStep).toEqual({
+      kind: 'done',
+      workId: 'work-1',
+      title: 'Book',
+      editionId: 'edition-1',
+    })
+    expect(repeatSameEdition(doneStep)).toEqual(copyStep)
   })
 
   it('starts an existing work at translation selection', () => {
