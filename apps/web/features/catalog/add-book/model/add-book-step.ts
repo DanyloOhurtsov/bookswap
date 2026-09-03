@@ -1,12 +1,4 @@
-import type { AuthorRole, BookLookupResult, Translation } from '@bookswap/shared'
-
-export interface AuthorEntry {
-  key: string
-  name: string
-  /** Set only after an explicit selection, never from a name match. */
-  authorId?: string
-  role: AuthorRole
-}
+import type { BookLookupResult, Translation } from '@bookswap/shared'
 
 type SearchStep = { kind: 'search' }
 

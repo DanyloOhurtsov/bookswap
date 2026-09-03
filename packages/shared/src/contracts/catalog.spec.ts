@@ -44,6 +44,12 @@ describe('createWorkRequestSchema', () => {
     expect(createWorkRequestSchema.safeParse({ ...work, authors: [] }).success).toBe(false)
   })
 
+  it('повертає придатне для форми повідомлення про порожнє імʼя автора', () => {
+    const result = createWorkRequestSchema.safeParse({ ...work, authors: [{ name: '' }] })
+
+    expect(result.error?.issues[0]?.message).toBe('Не вказано імʼя автора')
+  })
+
   it('відхиляє більше за стелю авторів', () => {
     const authors = Array.from({ length: CATALOG_LIMITS.authorsMax + 1 }, (_, index) => ({
       name: `Автор ${String(index)}`,
