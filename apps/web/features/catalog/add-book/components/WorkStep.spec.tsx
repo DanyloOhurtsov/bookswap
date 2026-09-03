@@ -103,6 +103,7 @@ it('preserves field-array order and roles for existing and new authors', async (
       expect.objectContaining({
         method: 'POST',
         body: expect.objectContaining({
+          firstPubYear: null,
           authors: [
             { authorId: 'author-existing', role: 'EDITOR' },
             { name: 'Леся Українка', role: 'CO_AUTHOR' },
