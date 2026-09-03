@@ -4,7 +4,7 @@ import type { BookLookupResult } from '@bookswap/shared'
  * §6.3, ланцюг `Work → Translation → Edition → Copy`: `BookLookupResult`
  * описує одне конкретне ISBN-видання, не абстрактний твір. Ця функція — єдине
  * місце, де lookup-результат розкладається по чернетках кроків майстра
- * (`catalog/new/page.tsx`), тому яке поле йде в яку сутність фіксується раз, а
+ * (`AddBookWizard`), тому яке поле йде в яку сутність фіксується раз, а
  * не повторюється в кожному кроці окремо.
  *
  * Правила mapping (виправлення cleanup Stage 7):

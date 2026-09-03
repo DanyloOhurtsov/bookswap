@@ -4,7 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import type { Edition, Translation, Work, WorkAuthor, WorkDetailResponse } from '@bookswap/shared'
-import NewBookPage from './page'
+import { AddBookWizard } from './AddBookWizard'
 
 /**
  * Компонентні тести на чотири гілки флоу (Етап 7d, DoD):
@@ -127,7 +127,7 @@ beforeEach(() => {
 async function search(query: string): Promise<void> {
   const user = userEvent.setup()
 
-  render(<NewBookPage />)
+  render(<AddBookWizard />)
 
   const input = await screen.findByLabelText('Назва або ISBN')
   await user.type(input, query)
