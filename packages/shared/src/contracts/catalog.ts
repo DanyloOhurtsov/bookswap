@@ -264,7 +264,12 @@ export type SearchCandidatesResponse = z.infer<typeof searchCandidatesResponseSc
 export const workAuthorInputSchema = z
   .object({
     authorId: idSchema.optional(),
-    name: z.string().trim().min(1).max(CATALOG_LIMITS.authorNameMax).optional(),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Не вказано імʼя автора')
+      .max(CATALOG_LIMITS.authorNameMax)
+      .optional(),
     nameLatin: z.string().trim().min(1).max(CATALOG_LIMITS.authorNameMax).nullable().optional(),
     role: authorRoleSchema.optional(),
   })
