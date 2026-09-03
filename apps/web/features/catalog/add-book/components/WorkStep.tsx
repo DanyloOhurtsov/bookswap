@@ -47,7 +47,7 @@ function nullableText(value: unknown): unknown {
 }
 
 function nullableNumber(value: unknown): unknown {
-  return value === '' ? null : Number(value)
+  return value === '' || value === null || value === undefined ? null : Number(value)
 }
 
 function defaultValues(
