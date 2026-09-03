@@ -3,7 +3,7 @@ import { mapLookupResultToDraft } from './lookup-mapping'
 
 /**
  * Cleanup Stage 7: до цієї функції lookup-мапінг був розмазаний по
- * `useState`-ініціалізаторах кроків майстра (`catalog/new/page.tsx`), і саме
+ * `useState`-ініціалізаторах кроків майстра (тепер `AddBookWizard`), і саме
  * там `publishedYear` (рік видання) помилково потрапляв у чернетку
  * `Work.firstPubYear`. Тести нижче фіксують правильну семантику §6.3 напряму,
  * без рендеру React.
