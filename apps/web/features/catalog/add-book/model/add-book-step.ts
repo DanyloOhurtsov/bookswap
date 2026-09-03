@@ -1,4 +1,4 @@
-import type { BookLookupResult, Translation } from '@bookswap/shared'
+import type { BookLookupResult, CopyEntryMethod, Translation } from '@bookswap/shared'
 
 type SearchStep = { kind: 'search' }
 
@@ -7,6 +7,7 @@ type WorkStep = {
   initialTitle: string
   isbn?: string
   lookup?: BookLookupResult
+  entryMethod: CopyEntryMethod
 }
 
 type CatalogContext = {
@@ -14,6 +15,7 @@ type CatalogContext = {
   title: string
   isbn?: string
   lookup?: BookLookupResult
+  entryMethod: CopyEntryMethod
 }
 
 type TranslationStep = CatalogContext & {
@@ -32,6 +34,7 @@ type CopyStep = {
   workId: string
   title: string
   editionId: string
+  entryMethod: CopyEntryMethod
 }
 
 type DoneStep = { kind: 'done'; workId: string; title: string; editionId: string }
@@ -64,6 +67,7 @@ export function continueAfterWork(step: WorkStep, created: CreatedWork): Transla
   return {
     kind: 'translation',
     ...created,
+    entryMethod: step.entryMethod,
     ...(step.isbn === undefined ? {} : { isbn: step.isbn }),
     ...(step.lookup === undefined ? {} : { lookup: step.lookup }),
   }
@@ -78,13 +82,20 @@ export function continueAfterTranslation(
     workId: step.workId,
     title: step.title,
     translationId,
+    entryMethod: step.entryMethod,
     ...(step.isbn === undefined ? {} : { isbn: step.isbn }),
     ...(step.lookup === undefined ? {} : { lookup: step.lookup }),
   }
 }
 
 export function continueAfterEdition(step: EditionStep, editionId: string): CopyStep {
-  return { kind: 'copy', workId: step.workId, title: step.title, editionId }
+  return {
+    kind: 'copy',
+    workId: step.workId,
+    title: step.title,
+    editionId,
+    entryMethod: step.entryMethod,
+  }
 }
 
 export function completeAddBook(step: CopyStep): DoneStep {
@@ -96,11 +107,13 @@ export function completeAddBook(step: CopyStep): DoneStep {
   }
 }
 
+/** §R11: «Ще один такий примірник» не сканує заново — метод завжди MANUAL. */
 export function repeatSameEdition(step: DoneStep): CopyStep {
   return {
     kind: 'copy',
     workId: step.workId,
     title: step.title,
     editionId: step.editionId,
+    entryMethod: 'MANUAL',
   }
 }

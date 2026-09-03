@@ -27,6 +27,21 @@ jest.mock('@/app/lib/api', () => {
   return { ...actual, apiRequest: jest.fn() }
 })
 
+/**
+ * `BarcodeScannerPanel` has its own dedicated spec covering camera
+ * lifecycle/errors — here it's replaced by a deterministic stand-in so these
+ * tests exercise only the entry-method threading contract end to end.
+ * Mocked by the named loader module — see `SearchStep.spec.tsx` for why.
+ */
+jest.mock('../lib/load-barcode-scanner-panel', () => ({
+  loadBarcodeScannerPanel: () =>
+    Promise.resolve(({ onValidIsbn }: { onValidIsbn: (isbn: string) => void }) => (
+      <button type="button" onClick={() => onValidIsbn('9783161484100')}>
+        Simulate scan
+      </button>
+    )),
+}))
+
 jest.mock('@/app/lib/use-session', () => ({
   useSession: () => ({
     state: { status: 'authenticated', user: { id: 'me', name: 'Тест', email: 't@example.com' } },
@@ -136,6 +151,17 @@ async function search(query: string): Promise<void> {
   const input = await screen.findByLabelText('Назва або ISBN')
   await user.type(input, query)
   await user.click(screen.getByRole('button', { name: 'Шукати' }))
+}
+
+/** Renders `/catalog/new?mode=scan` and drives the mocked scanner to a valid decode. */
+async function searchViaScan(): Promise<void> {
+  searchParams = new URLSearchParams('mode=scan')
+  const user = userEvent.setup()
+
+  render(<AddBookWizard />)
+
+  const scanButton = await screen.findByRole('button', { name: 'Simulate scan' })
+  await user.click(scanButton)
 }
 
 describe('крок 1 — пошук кандидатів', () => {
@@ -741,6 +767,135 @@ describe('помилки провайдера й rate limiting', () => {
         'Зовнішній сервіс автозаповнення зараз недоступний. Можна заповнити форму вручну.',
       ),
     ).toBeInTheDocument()
+  })
+})
+
+describe('camera scan — entryMethod BARCODE', () => {
+  it('a scanned ISBN on the existing-Edition branch creates a Copy with entryMethod BARCODE', async () => {
+    let copyBody: unknown
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [
+          candidate({ editions: [edition({ id: 'edition-match', isbn13: CANDIDATE_ISBN })] }),
+        ],
+      }),
+      '/me/library': ({ body }) => {
+        copyBody = body
+        return undefined
+      },
+    })
+
+    await searchViaScan()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+
+    await waitFor(() => expect(copyBody).toMatchObject({ entryMethod: 'BARCODE' }))
+  })
+
+  it('a scanned ISBN on the existing-Work → Translation → Edition branch keeps entryMethod BARCODE', async () => {
+    let copyBody: unknown
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({ candidates: [candidate({ editions: [] })] }),
+      '/works/work-1/editions': () => ({ edition: edition({ id: 'edition-new' }) }),
+      '/me/library': ({ body }) => {
+        copyBody = body
+        return undefined
+      },
+    })
+
+    await searchViaScan()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'У мене інше видання цього твору' }))
+    await user.click(await screen.findByRole('button', { name: 'Пропустити — це оригінал' }))
+    await user.click(await screen.findByRole('button', { name: 'Далі: мій примірник' }))
+    await user.click(await screen.findByRole('button', { name: 'Додати до бібліотеки' }))
+
+    await waitFor(() => expect(copyBody).toMatchObject({ entryMethod: 'BARCODE' }))
+  })
+
+  it('a scanned ISBN on the new-Work → Translation → Edition branch keeps entryMethod BARCODE', async () => {
+    let copyBody: unknown
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({ candidates: [] }),
+      '/works': () => ({
+        work: work({ id: 'work-new', title: 'Новий твір' }),
+        authors: [],
+        translations: [],
+        editions: [],
+      }),
+      '/works/work-new/editions': () => ({
+        edition: edition({ id: 'edition-new', workId: 'work-new' }),
+      }),
+      '/me/library': ({ body }) => {
+        copyBody = body
+        return undefined
+      },
+    })
+
+    await searchViaScan()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Створити новий твір' }))
+    await user.type(screen.getByLabelText('Імʼя'), 'Тестовий Автор')
+    await user.click(screen.getByRole('button', { name: 'Далі: переклад' }))
+    await user.click(await screen.findByRole('button', { name: 'Пропустити — це оригінал' }))
+    await user.click(await screen.findByRole('button', { name: 'Далі: мій примірник' }))
+    await user.click(await screen.findByRole('button', { name: 'Додати до бібліотеки' }))
+
+    await waitFor(() => expect(copyBody).toMatchObject({ entryMethod: 'BARCODE' }))
+  })
+
+  it('repeating the same Edition after a BARCODE-originated copy still POSTs MANUAL', async () => {
+    const copyBodies: unknown[] = []
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [candidate({ editions: [edition({ id: 'edition-repeat' })] })],
+      }),
+      '/me/library': ({ body }) => {
+        copyBodies.push(body)
+        return undefined
+      },
+    })
+
+    await searchViaScan()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+    await user.click(await screen.findByRole('button', { name: 'Ще один такий примірник' }))
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+    await screen.findByText(/тепер у вашій бібліотеці/)
+
+    expect(copyBodies).toHaveLength(2)
+    expect(copyBodies[0]).toMatchObject({ entryMethod: 'BARCODE' })
+    expect(copyBodies[1]).toMatchObject({ entryMethod: 'MANUAL' })
+  })
+
+  it('manual fallback in scan mode (e.g. after a camera error) still POSTs MANUAL', async () => {
+    let copyBody: unknown
+    searchParams = new URLSearchParams('mode=scan')
+    routeApiRequest({
+      '/catalog/search/candidates': () => ({
+        candidates: [candidate({ editions: [edition({ id: 'edition-manual' })] })],
+      }),
+      '/me/library': ({ body }) => {
+        copyBody = body
+        return undefined
+      },
+    })
+
+    const user = userEvent.setup()
+    render(<AddBookWizard />)
+
+    // The user never uses the scanner (e.g. it errored) — falls back to the
+    // manual field, which is always visible alongside it.
+    const input = await screen.findByLabelText('Назва або ISBN')
+    await user.type(input, 'Кобзар')
+    await user.click(screen.getByRole('button', { name: 'Шукати' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Це моє видання' }))
+    await user.click(screen.getByRole('button', { name: 'Додати до бібліотеки' }))
+
+    await waitFor(() => expect(copyBody).toMatchObject({ entryMethod: 'MANUAL' }))
   })
 })
 

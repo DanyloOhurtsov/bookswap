@@ -1,18 +1,20 @@
-import type { WorkDetailResponse } from '@bookswap/shared'
+import type { CopyEntryMethod, WorkDetailResponse } from '@bookswap/shared'
 import type { AddBookSearchResult } from '../api/search-add-book'
 import type { ExistingEditionInput, ExistingWorkInput, NewWorkInput } from '../model/add-book-step'
 import { CandidateCard } from './CandidateCard'
 
 type SearchResultsProps = {
   result: AddBookSearchResult
+  entryMethod: CopyEntryMethod
   onFoundEdition: (selection: ExistingEditionInput) => void
   onFoundWork: (selection: ExistingWorkInput) => void
   onCreateNew: (selection: NewWorkInput) => void
 }
 
-function newWorkInput(result: AddBookSearchResult): NewWorkInput {
+function newWorkInput(result: AddBookSearchResult, entryMethod: CopyEntryMethod): NewWorkInput {
   return {
     initialTitle: result.lookup?.title ?? result.query,
+    entryMethod,
     ...(result.isbn === undefined ? {} : { isbn: result.isbn }),
     ...(result.lookup === undefined ? {} : { lookup: result.lookup }),
   }
@@ -21,11 +23,13 @@ function newWorkInput(result: AddBookSearchResult): NewWorkInput {
 function existingWorkInput(
   result: AddBookSearchResult,
   candidate: WorkDetailResponse,
+  entryMethod: CopyEntryMethod,
 ): ExistingWorkInput {
   return {
     workId: candidate.work.id,
     title: candidate.work.title,
     existingTranslations: candidate.translations,
+    entryMethod,
     ...(result.isbn === undefined ? {} : { isbn: result.isbn }),
     ...(result.lookup === undefined ? {} : { lookup: result.lookup }),
   }
@@ -33,6 +37,7 @@ function existingWorkInput(
 
 export function SearchResults({
   result,
+  entryMethod,
   onFoundEdition,
   onFoundWork,
   onCreateNew,
@@ -41,7 +46,7 @@ export function SearchResults({
     return (
       <>
         <p className="empty">Нічого схожого не знайшлося. Заведемо новий твір.</p>
-        <button type="button" onClick={() => onCreateNew(newWorkInput(result))}>
+        <button type="button" onClick={() => onCreateNew(newWorkInput(result, entryMethod))}>
           Створити новий твір
         </button>
       </>
@@ -62,9 +67,10 @@ export function SearchResults({
                 workId: candidate.work.id,
                 title: candidate.work.title,
                 editionId,
+                entryMethod,
               })
             }}
-            onUseWork={() => onFoundWork(existingWorkInput(result, candidate))}
+            onUseWork={() => onFoundWork(existingWorkInput(result, candidate, entryMethod))}
           />
         ))}
       </ul>
@@ -74,7 +80,7 @@ export function SearchResults({
         <button
           type="button"
           className="button--ghost"
-          onClick={() => onCreateNew(newWorkInput(result))}
+          onClick={() => onCreateNew(newWorkInput(result, entryMethod))}
         >
           Завести новий твір
         </button>
