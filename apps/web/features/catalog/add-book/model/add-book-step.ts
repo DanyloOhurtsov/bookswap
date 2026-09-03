@@ -47,9 +47,9 @@ type DoneStep = { kind: 'done'; workId: string; title: string }
 export type AddBookStep =
   SearchStep | WorkStep | TranslationStep | EditionStep | CopyStep | DoneStep
 
-type NewWorkInput = Omit<WorkStep, 'kind'>
-type ExistingWorkInput = Omit<TranslationStep, 'kind'>
-type ExistingEditionInput = Omit<CopyStep, 'kind'>
+export type NewWorkInput = Omit<WorkStep, 'kind'>
+export type ExistingWorkInput = Omit<TranslationStep, 'kind'>
+export type ExistingEditionInput = Omit<CopyStep, 'kind'>
 type CreatedWork = Pick<TranslationStep, 'workId' | 'title'>
 
 export function createSearchStep(): SearchStep {
