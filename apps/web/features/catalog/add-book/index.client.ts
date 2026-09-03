@@ -1,4 +1,6 @@
 export { AddBookShell } from './components/AddBookShell'
+export { CopyStep } from './components/CopyStep'
+export { EditionStep } from './components/EditionStep'
 export { LanguageField } from './components/LanguageField'
 export { SearchStep } from './components/SearchStep'
 export { TranslationStep } from './components/TranslationStep'

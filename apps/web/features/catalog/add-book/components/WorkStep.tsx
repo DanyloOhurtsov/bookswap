@@ -22,6 +22,7 @@ import { TextAreaField, TextField } from '@/components/Form/FormFields'
 import { FormStatus } from '@/components/Form/FormStatus'
 import { AuthorRow } from './AuthorRow'
 import { LanguageField } from './LanguageField'
+import { nullableNumber, nullableText } from '../model/form-values'
 
 type WorkStepProps = {
   initialTitle: string
@@ -40,14 +41,6 @@ function messageOf(error: unknown): string | undefined {
   if ('message' in error && typeof error.message === 'string') return error.message
   if ('root' in error) return messageOf(error.root)
   return 'name' in error ? messageOf(error.name) : undefined
-}
-
-function nullableText(value: unknown): unknown {
-  return typeof value === 'string' && value.trim() === '' ? null : value
-}
-
-function nullableNumber(value: unknown): unknown {
-  return value === '' || value === null || value === undefined ? null : Number(value)
 }
 
 function defaultValues(
