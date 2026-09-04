@@ -13,6 +13,24 @@ jest.mock('@/app/lib/api', () => {
   return { ...actual, apiRequest: jest.fn() }
 })
 
+/**
+ * `BarcodeScannerPanel` has its own dedicated spec covering camera
+ * lifecycle/errors — here it's replaced by a deterministic stand-in so
+ * `SearchStep` tests exercise only the entry-method threading contract.
+ * Mocked by the named loader module (not `./BarcodeScannerPanel` directly):
+ * `SearchStep` reaches it via `next/dynamic`, whose loader argument contains
+ * a real dynamic `import()` that this project's ts-jest config can't
+ * execute — mocking the whole loader module sidesteps that entirely.
+ */
+jest.mock('../lib/load-barcode-scanner-panel', () => ({
+  loadBarcodeScannerPanel: () =>
+    Promise.resolve(({ onValidIsbn }: { onValidIsbn: (isbn: string) => void }) => (
+      <button type="button" onClick={() => onValidIsbn('9783161484100')}>
+        Simulate scan
+      </button>
+    )),
+}))
+
 const { apiRequest: mockApiRequest } = jest.requireMock<{ apiRequest: jest.Mock }>('@/app/lib/api')
 
 const ISBN = '9783161484100'
@@ -59,14 +77,14 @@ function deferred<T>() {
   }
 }
 
-function renderSearch(initialQuery = '') {
+function renderSearch(initialQuery = '', entryMode: 'manual' | 'scan' = 'manual') {
   const callbacks = {
     onFoundEdition: jest.fn(),
     onFoundWork: jest.fn(),
     onCreateNew: jest.fn(),
   }
 
-  render(<SearchStep initialQuery={initialQuery} {...callbacks} />)
+  render(<SearchStep initialQuery={initialQuery} entryMode={entryMode} {...callbacks} />)
 
   return callbacks
 }
@@ -111,6 +129,7 @@ it('starts candidate and ISBN lookup requests in parallel and preserves the sele
     workId: 'work-1',
     title: 'Кобзар',
     editionId: 'edition-1',
+    entryMethod: 'MANUAL',
   })
 
   await user.click(screen.getByRole('button', { name: 'У мене інше видання цього твору' }))
@@ -120,6 +139,7 @@ it('starts candidate and ISBN lookup requests in parallel and preserves the sele
     isbn: ISBN,
     lookup,
     existingTranslations: [],
+    entryMethod: 'MANUAL',
   })
 })
 
@@ -146,5 +166,72 @@ it('keeps the validated query for a retry and then creates a new work from its r
   await user.click(await screen.findByRole('button', { name: 'Створити новий твір' }))
 
   expect(mockApiRequest).toHaveBeenCalledTimes(2)
-  expect(callbacks.onCreateNew).toHaveBeenCalledWith({ initialTitle: 'Дюна' })
+  expect(callbacks.onCreateNew).toHaveBeenCalledWith({
+    initialTitle: 'Дюна',
+    entryMethod: 'MANUAL',
+  })
+})
+
+describe('entryMode="scan"', () => {
+  it('shows the scanner alongside the always-visible manual field', async () => {
+    renderSearch('', 'scan')
+
+    expect(screen.getByLabelText('Назва або ISBN')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Simulate scan' })).toBeInTheDocument()
+  })
+
+  it('does not show the scanner in manual mode', () => {
+    renderSearch('', 'manual')
+
+    expect(screen.queryByRole('button', { name: 'Simulate scan' })).not.toBeInTheDocument()
+  })
+
+  it('routes a scanned ISBN through the same search orchestration and tags the result BARCODE', async () => {
+    mockApiRequest.mockImplementation((path: string) => {
+      return path.startsWith('/catalog/search/candidates')
+        ? Promise.resolve({ candidates: [candidate] })
+        : Promise.resolve({ result: lookup })
+    })
+
+    const callbacks = renderSearch('', 'scan')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }))
+
+    expect(await screen.findByText('точний збіг за ISBN')).toBeInTheDocument()
+    expect(mockApiRequest).toHaveBeenCalledWith(
+      expect.stringContaining('/catalog/search/candidates'),
+      expect.anything(),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Це моє видання' }))
+    expect(callbacks.onFoundEdition).toHaveBeenCalledWith({
+      workId: 'work-1',
+      title: 'Кобзар',
+      editionId: 'edition-1',
+      entryMethod: 'BARCODE',
+    })
+  })
+
+  it('a manual submit after a successful scan resets the tag to MANUAL and stops the scanner', async () => {
+    mockApiRequest.mockResolvedValue({ candidates: [candidate] })
+
+    const callbacks = renderSearch('', 'scan')
+    const user = userEvent.setup()
+
+    const scanButton = screen.getByRole('button', { name: 'Simulate scan' })
+    await user.click(scanButton)
+    await screen.findByRole('button', { name: 'Це моє видання' })
+
+    await user.type(screen.getByLabelText('Назва або ISBN'), 'Кобзар')
+    await user.click(screen.getByRole('button', { name: 'Шукати' }))
+    await screen.findByRole('button', { name: 'Це моє видання' })
+
+    await user.click(screen.getByRole('button', { name: 'Це моє видання' }))
+    expect(callbacks.onFoundEdition).toHaveBeenLastCalledWith(
+      expect.objectContaining({ entryMethod: 'MANUAL' }),
+    )
+
+    // The scanner remounted (key bump) — a fresh instance, not the stale one.
+    expect(screen.getByRole('button', { name: 'Simulate scan' })).not.toBe(scanButton)
+  })
 })

@@ -63,7 +63,13 @@ export function AddBookWizard() {
           signal: controller.signal,
         })
 
-        setStep(selectExistingWork({ workId: detail.work.id, title: detail.work.title }))
+        setStep(
+          selectExistingWork({
+            workId: detail.work.id,
+            title: detail.work.title,
+            entryMethod: 'MANUAL',
+          }),
+        )
       } catch (error) {
         if (controller.signal.aborted) return
 
@@ -102,6 +108,7 @@ export function AddBookWizard() {
         <SearchStep
           key={`${entryMode}:${initialQuery}`}
           initialQuery={initialQuery}
+          entryMode={entryMode}
           onFoundEdition={(selection) => {
             setStep(selectExistingEdition(selection))
           }}
@@ -151,7 +158,7 @@ export function AddBookWizard() {
         <CopyStep
           editionId={step.editionId}
           defaults={copyDefaults}
-          entryMethod="MANUAL"
+          entryMethod={step.entryMethod}
           onDone={(nextDefaults) => {
             setCopyDefaults(nextDefaults)
             setStep(completeAddBook(step))
