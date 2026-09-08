@@ -518,7 +518,7 @@ Public v1, коли одночасно виконано таке:
 | Частина                      | Поточний стан                       | Що залишилося                                                               |
 | ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------- |
 | Ядро позичання               | Реалізовано                         | Підтримка, виправлення дефектів і real-world entry flows                    |
-| Inventory activation         | Є ручний ISBN flow                  | Camera scan, CSV import, repeat-add, metadata correction                    |
+| Inventory activation         | Є ручний ISBN flow, camera scan й repeat-add | CSV import, metadata correction                                    |
 | Network activation/discovery | Є ручна дружба й бібліотека 1 друга | Invite link/email, aggregated search, Who has this                          |
 | Існуючі та гостьові позики   | Немає                               | Existing loan, ExternalBorrower, archive/recovered                          |
 | Retention                    | Є reminders і пасивний wishlist     | Wishlist matches, extension, share/feed                                     |

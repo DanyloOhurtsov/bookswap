@@ -1,6 +1,9 @@
 # Етап 8b–8h — inventory activation
 
-**Статус:** затверджений execution plan; реалізацію не розпочато.
+**Статус:** 8b (архітектурна межа wizard), 8c (швидке послідовне додавання) і 8d
+(barcode/camera scan) завершені й у main. 8e (correction/audit), 8f (CSV
+parser і preview), 8g (atomic import commit) і 8h (onboarding і закриття
+етапу) ще не розпочаті.
 
 **Передумова:** Етап 8a (product analytics) завершено.
 
