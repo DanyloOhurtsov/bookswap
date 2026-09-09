@@ -24,7 +24,12 @@ import { z } from 'zod'
 
 const webCwd = path.resolve(__dirname, '..')
 const repoRootCwd = path.resolve(webCwd, '..', '..')
-const eslintBin = path.join(webCwd, 'node_modules/.bin/eslint')
+// ESLint is a root workspace dependency, so a clean pnpm install is only guaranteed to create
+// its shim under the root node_modules/.bin. Resolve the package itself from that root and run
+// the JavaScript entry point with Node instead of depending on a package-local or OS-specific
+// shell shim.
+const eslintPackageJson = require.resolve('eslint/package.json', { paths: [repoRootCwd] })
+const eslintCli = path.join(path.dirname(eslintPackageJson), 'bin/eslint.js')
 
 const lintMessageSchema = z.object({
   ruleId: z.string().nullable(),
@@ -48,7 +53,7 @@ type LintResult = z.infer<typeof lintResultSchema>
  * result for it would make "the rule found nothing" indistinguishable from "the rule never ran".
  */
 function runEslintCli(files: string[], options: { cwd: string }): LintResult {
-  const result = spawnSync(eslintBin, ['--format', 'json', ...files], {
+  const result = spawnSync(process.execPath, [eslintCli, '--format', 'json', ...files], {
     cwd: options.cwd,
     encoding: 'utf-8',
   })
