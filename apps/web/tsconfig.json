@@ -15,5 +15,9 @@
     "plugins": [{ "name": "next" }]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", ".next"]
+  // TD-01: eslint-fixtures/feature-composition/ carries its own eslint.config.mjs and imports
+  // fake `@/features/fixture-feature-*` paths on purpose, to exercise no-restricted-imports
+  // pattern matching (which never resolves modules) without a real second product feature.
+  // Those paths don't exist under the real `@/*` -> `./*` alias, so tsc must not see them.
+  "exclude": ["node_modules", ".next", "eslint-fixtures/feature-composition"]
 }
