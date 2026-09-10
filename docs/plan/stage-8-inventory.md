@@ -52,6 +52,10 @@ execution plan для незавершеної частини Етапу 8.
   історії змін.
 - Open Library provider виконує single-ISBN lookup; import не повинен викликати
   його або БД послідовно для кожного рядка.
+- `useWork` (`apps/web/app/lib/use-catalog.ts`) читає Work окремо від
+  `useApiResource`: власний `useState`/`useEffect`/nonce цикл, і його `reload()` —
+  `() => void`, не `Promise<void>` (на відміну від `useApiResource.reload()`).
+  Наслідки для correction — R12.
 
 ## 3. Зафіксовані рішення
 
@@ -240,6 +244,98 @@ conflict і merged Work лишають чинні canonical/error semantics.
 `nextAction`. Checklist рендериться server-first у бібліотеці й після add/import;
 при 10 книгах CTA веде до чинної сторінки friends. Invite links належать Етапу 9.
 
+### R12. TD-03: TanStack Query для correction і CSV import
+
+Загальне правило й обов'язкові вимоги реалізації зафіксовані в
+`docs/CONVENTIONS.md` §3.9. Тут — лише те, що специфічне для 8e-3/8f-3.
+
+**Хто володіє Work state.** Сторінка `apps/web/app/(pages)/works/[id]/page.tsx`
+сьогодні читає Work/Translation/Edition через legacy `useWork`
+(`apps/web/app/lib/use-catalog.ts`) — окремий від `useApiResource` цикл
+`useState`/`useEffect`/nonce, і саме туди приїде `viewerCapabilities` (R10) разом
+із рештою `WorkDetailResponse`. 8e-3 не заводить паралельний TanStack `useQuery` на
+той самий ресурс: `useWork` лишається єдиним читачем і єдиним кешем Work-даних на
+цій сторінці. TanStack Query у 8e-3 керує лише мутацією (`useMutation` на
+`PATCH /works/:id` / `/translations/:id` / `/editions/:id`) — pending/error станом
+запиту й optimistic-патчем, який рендериться поверх значення з `useWork`, тим самим
+прийомом «overlay над останнім відомим станом», що вже є в
+`resource-state.ts`/`wishlist.ts`.
+
+**`useWork` + TanStack `useMutation` в одному компоненті — вузький legacy-виняток,
+специфічний саме для 8e-3, а не взірець для інших фіч.** §3.9 CONVENTIONS.md
+залишає legacy-хуки без міграції; тут додатково свідомо змішуються дві різні
+бібліотеки в одному екрані (читання — старою, запис — новою), бо повна міграція
+читання Work на TanStack Query — це вже інша, більша задача (§3.9: «міграція —
+окремі обґрунтовані задачі, не масове переписування»), а мутації Work у 8e-3
+потрібні вже зараз.
+
+Після успішного PATCH форма викликає `reload()` з `useWork`, а не
+`invalidateQueries` на ключ Work — інвалідація TanStack cache нічого не зробить із
+даними, які показує legacy-хук, бо кеш не спільний.
+
+**Відкрита технічна нестиковка для 8e-3 (не вирішується цим документом).**
+`useWork().reload` сьогодні — `() => void` (не awaitable), на відміну від
+`useApiResource.reload()` (`() => Promise<void>`, резолвиться саме на завершення
+спричиненого запиту). Яким би не був конкретний механізм, він має задовольняти дві
+вимоги, а не одну:
+
+1. **Перевіряється revision саме зміненої сутності**, а не Work загалом: PATCH
+   Work, Translation чи Edition кожен рухає `revision` лише своєї сутності
+   (R9) — форма редагування перекладу звіряє `revision` цього Translation у
+   свіжому знімку, а не `Work.revision`, який міг не змінитися взагалі.
+2. **Завершення refresh відрізняє success, error і cancellation** — трьома
+   окремими результатами, не одним булевим «дані оновились». Сама лише незмінена
+   revision у новому знімку НЕ доводить, що запит ще летить: та сама ознака
+   однаково настає і коли refresh уже завершився помилкою (мережа впала), і коли
+   його випередив/скасував наступний виклик `reload()` (той самий клас гонитви,
+   що й `useApiResource`, — `use-catalog.ts` жодного generation-захисту від нього
+   не має). Механізм 8e-3 мусить розрізняти ці три випадки явно (наприклад:
+   зробити `useWork.reload` awaitable й пробросити результат/помилку виклику, а
+   не лише факт «проміс резолвився»), а не виводити «завершено» з самого факту
+   зміни чи незміни `revision`.
+
+Конкретний механізм (awaitable `reload`, чи інший) реалізується в 8e-3; це той
+«реальний вибір», який план залишає відкритим, а не мовчки вирішеним.
+
+**Один canonical query для CSV import (8f-3).** `GET /me/library/imports/:id`
+повертає повний draft — summary і rows разом, за контрактом R5/R6 — і це один
+query key: `['library-import', importId]`. Окремого `rows`-ендпоінта в API немає
+(§4), тож окремого query key чи окремого кеша під рядки таблиця не заводить: рядки
+в UI — похідне представлення того самого кешованого документа (`select` у
+`useQuery`, не другий запит).
+
+`PATCH .../rows/:rowNumber` (resolve/skip) інвалідує/оновлює саме
+`['library-import', importId]` — весь draft, а не лише один рядок: відповідь
+цього PATCH або наступний GET має принести й новий статус рядка, і перерахований
+стан готовності до commit (чи всі рядки тепер `READY_*`/`SKIPPED`) в тому самому
+об'єкті. Optimistic-патч (якщо він є) так само пише в цей один ключ, не в
+паралельну структуру «лише для цього рядка» — інакше готовність до commit і
+таблиця рядків можуть розійтися між двома джерелами.
+
+`POST .../commit` інвалідує той самий `['library-import', importId]` (draft стає
+завершеним summary). Жодна з цих mutations не перетинається з
+`useWork`/`useApiResource` — preview і commit не мають legacy-читача цього самого
+ресурсу, з яким треба узгоджуватись, тому тут немає подвійного джерела правди для
+самого імпорту, на відміну від correction.
+
+Після успішного commit власна бібліотека й activation progress повинні
+відображати створені Copy. Для змонтованого legacy `useOwnLibrary` потрібне явне
+перезавантаження; інвалідація TanStack Query його не оновлює. Спосіб актуалізації
+server-first activation визначається в 8h відповідно до R11. Сам факт навігації не
+гарантує свіжих даних — сценарій commit → актуальна бібліотека та прогрес
+покривається тестом.
+
+**Залежність і мінімальний setup.** `@tanstack/react-query` у репозиторії ще немає.
+Встановлення пакета, мінімальний `QueryClientProvider` (один на клієнтську сесію,
+без серверного singleton, спільного між запитами або користувачами; ізольований
+request-scoped екземпляр дозволений — CONVENTIONS.md §3.9) і
+тестова обгортка (`QueryClientProvider` у `jest`/`@testing-library/react`, той
+самий стек, що й решта `apps/web`) плануються як перший узгоджений крок 8e-3, ПІСЛЯ
+завершення 8e-2 (API готове) — не в цьому документі й не до нього. Універсальний
+mutation-adapter поверх TanStack Query для всіх майбутніх фіч у 8e-3 не
+проєктується: кожна фіча (correction, потім CSV rows у 8f-3) визначає власні query
+keys і mutations без спільної абстракції на цьому етапі.
+
 ## 4. API і shared contracts
 
 Нові endpoints:
@@ -351,9 +447,13 @@ JSON не замінює shared contract. Жодного historical backfill aud
 
 ### 8e-3 — correction UI
 
-- RHF + Zod форми з capabilities, optimistic update/rollback і conflict refresh.
+- Перший крок: додати `@tanstack/react-query`, мінімальний `QueryClientProvider` і
+  test setup — до форм, після 8e-2 (R12).
+- RHF + Zod форми з capabilities, optimistic update/rollback і conflict refresh на
+  TanStack Query `useMutation`; `useWork` лишається єдиним читачем Work-даних (R12).
 - **DoD:** keyboard/mobile/error states перевірені; неавторизований edit control не
-  показується, але API лишається остаточною межею permissions.
+  показується, але API лишається остаточною межею permissions; успішний PATCH
+  оновлює і власний optimistic overlay, і legacy `useWork` сторінки Work (R12).
 
 ### 8f-1 — CSV parser і import persistence
 
@@ -369,7 +469,11 @@ JSON не замінює shared contract. Жодного historical backfill aud
 
 ### 8f-3 — CSV preview UI
 
-- Upload/template, row table, filters, errors, edit/choose/skip і resume draft.
+- Upload/template, row table, filters, errors, edit/choose/skip і resume draft на
+  TanStack Query, один canonical query `['library-import', importId]` (draft +
+  rows разом, R12); rows table — `select` над цим самим запитом, не окремий ключ.
+- Після успішного commit явно оновити бібліотеку й (коли готовий) activation —
+  legacy-читачі не бачать `invalidateQueries` (R12); координується з 8g/8h.
 - **DoD:** commit disabled до повної resolution; 200 rows usable на mobile/desktop;
   private note рендериться лише як text, ніколи як HTML/formula execution.
 
