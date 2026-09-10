@@ -378,9 +378,11 @@ export class CatalogService {
         name: true,
         nameLatin: true,
         // DoD 7h: merged works are not separate entries anywhere in the output,
-        // and a count is an entry too. The merge does NOT move `WorkAuthor`
-        // rows, so without this filter an author linked to both the duplicate
-        // and the canonical work is credited with two books instead of one.
+        // and a count is an entry too. TD-06 has `MergeService` consolidate
+        // `WorkAuthor` onto the canonical work, so this filter no longer earns
+        // its keep against merges done from here on — it stays as a guard
+        // against data merged before that fix, where a duplicate row could
+        // still be sitting on the non-canonical work.
         works: { where: { work: { mergedIntoId: null } }, select: { workId: true } },
       },
     })

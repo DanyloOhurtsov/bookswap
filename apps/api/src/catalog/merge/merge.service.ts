@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import type { AuthorRole } from '../../generated/prisma/enums'
 import { PrismaService } from '../../prisma/prisma.service'
 import { WORK_MERGE_ERROR_CODES, WorkMergeError } from './merge-errors'
 
@@ -12,6 +13,8 @@ export interface MergeSummary {
   reviewsArchived: number
   wishlistItemsMoved: number
   wishlistDuplicatesRemoved: number
+  authorLinksMoved: number
+  authorLinksDuplicatesRemoved: number
   incomingMergesRepointed: number
 }
 
@@ -65,6 +68,7 @@ export class MergeService {
       const editions = await tx.edition.updateMany(onSource)
       const reviews = await moveReviews(tx, sourceWorkId, targetWorkId)
       const wishlistItems = await tx.wishlistItem.updateMany(onSource)
+      const authorLinks = await this.consolidateWorkAuthors(tx, sourceWorkId, targetWorkId)
 
       // R4, глибина розв'язання рівно 1: усе, що вказувало на вихідний твір,
       // має тепер вказувати на цільовий. Без цього рядка `merge(A→B)`, а потім
@@ -89,6 +93,8 @@ export class MergeService {
         reviewsArchived,
         wishlistItemsMoved: wishlistItems.count,
         wishlistDuplicatesRemoved,
+        authorLinksMoved: authorLinks.moved,
+        authorLinksDuplicatesRemoved: authorLinks.duplicatesRemoved,
         incomingMergesRepointed: repointed.count,
       }
     })
@@ -236,6 +242,66 @@ export class MergeService {
 
     return removed.count
   }
+
+  /**
+   * TD-06: consolidates `WorkAuthor` links during a merge.
+   *
+   * A link's identity is the pair (`authorId`, `role`): the same author in a
+   * different role (e.g. author and also illustrator) is two separate links,
+   * and both must survive. `Author` itself and the source `Work` are never
+   * deleted — only `WorkAuthor` rows are touched.
+   *
+   * No query per author: two `findMany` (one per side) plus one `createMany`
+   * and one `deleteMany`, regardless of how many authors a work has.
+   *
+   * Rows the target doesn't have yet move over (`createMany` on the target).
+   * Rows that match an (`authorId`, `role`) already on the target are
+   * duplicates: creating a second identical link would violate the PK
+   * `(workId, authorId, role)`, so there's simply no `createMany` entry for
+   * them. Either way, the source row must stop existing separately from the
+   * canonical work, so every remaining source link is removed with one final
+   * `deleteMany` — whatever didn't get deduplicated has already moved.
+   */
+  private async consolidateWorkAuthors(
+    tx: TransactionClient,
+    sourceWorkId: string,
+    targetWorkId: string,
+  ): Promise<{ moved: number; duplicatesRemoved: number }> {
+    const [sourceLinks, targetLinks] = await Promise.all([
+      tx.workAuthor.findMany({
+        where: { workId: sourceWorkId },
+        select: { authorId: true, role: true },
+      }),
+      tx.workAuthor.findMany({
+        where: { workId: targetWorkId },
+        select: { authorId: true, role: true },
+      }),
+    ])
+
+    if (sourceLinks.length === 0) return { moved: 0, duplicatesRemoved: 0 }
+
+    const targetKeys = new Set(targetLinks.map((link) => linkKey(link)))
+    const toMove = sourceLinks.filter((link) => !targetKeys.has(linkKey(link)))
+
+    if (toMove.length > 0) {
+      await tx.workAuthor.createMany({
+        data: toMove.map((link) => ({
+          workId: targetWorkId,
+          authorId: link.authorId,
+          role: link.role,
+        })),
+      })
+    }
+
+    await tx.workAuthor.deleteMany({ where: { workId: sourceWorkId } })
+
+    return { moved: toMove.length, duplicatesRemoved: sourceLinks.length - toMove.length }
+  }
+}
+
+/** Identity key of a `WorkAuthor` link: the (author, role) pair, not the row itself. */
+function linkKey(link: { authorId: string; role: AuthorRole }): string {
+  return `${link.authorId}:${link.role}`
 }
 
 /**
@@ -244,7 +310,14 @@ export class MergeService {
  */
 type TransactionClient = Pick<
   PrismaService,
-  'work' | 'translation' | 'edition' | 'review' | 'wishlistItem' | '$queryRaw' | '$executeRaw'
+  | 'work'
+  | 'translation'
+  | 'edition'
+  | 'review'
+  | 'wishlistItem'
+  | 'workAuthor'
+  | '$queryRaw'
+  | '$executeRaw'
 >
 
 /**
