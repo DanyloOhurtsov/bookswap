@@ -192,7 +192,13 @@ Definition of done:
 - transactional outbox / атомарніший auth-workflow (межа, зафіксована в README на етапі 6)
 - rate limiting не рахує запити, що падають на валідації DTO (виявлено при перевірці 7a)
   — перевірити порядок гардів і покрити тестом
-- перерахунок Work.ratingAvg / ratingCount після мержу (§10.2) — закриває етап §6.7
+- **DEFERRED** — перерахунок Work.ratingAvg / ratingCount після мержу (§10.2): наразі не
+  реалізовано в `MergeService`. Це збережений технічний борг відкладеної ratings-підсистеми
+  (`docs/plan/roadmap-v2.md` §5), а не наступна активна задача цього етапу. Повернення до
+  реалізації — разом із ratings, лише після окремого Product Owner рішення за умовами
+  roadmap §5. Перед реалізацією треба уточнити формулу агрегатів Work (§10.2 виписує
+  байєсівську формулу лише для Translation.score, не для Work.ratingAvg) і поведінку
+  ratingAvg/ratingCount вихідного (non-canonical) Work після merge.
 - ~~об'єднання авторів (WorkAuthor) при мержі~~ — TD-06, закрито: `MergeService`
   консолідує зв'язки `WorkAuthor` у тій самій транзакції, що й решту мержу.
   Ідентичність зв'язку — пара (`authorId`, `role`), як і в PK `WorkAuthor`: рядки
