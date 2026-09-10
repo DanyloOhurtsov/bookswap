@@ -216,7 +216,9 @@ transaction. UI не потребує public audit endpoint у Stage 8.
 ### R10. Дозволені metadata fields
 
 - Work: `title`, `origLang`, `firstPubYear`, `description`, повний список
-  `authors` (`name`, `role`, `position`). Заміна зв'язків не видаляє Author rows.
+  `authors` (наявний `authorId` або нове `name`, роль і порядок елементів масиву).
+  `position` обчислює сервер за цим порядком, а не приймає окремим полем запиту.
+  Заміна зв'язків не видаляє Author rows.
 - Translation: `translator`, `lang`, `sourceLang`, `year`, `isAbridged`,
   `hasNotes`, `notes`.
 - Edition: `publisher`, `year`, `isbn13`, `pageCount`, `coverUrl`, `format` і
@@ -228,6 +230,36 @@ conflict і merged Work лишають чинні canonical/error semantics.
 
 `WorkDetailResponse` додає `viewerCapabilities` (`canEditWork`,
 `editableTranslationIds`, `editableEditionIds`), щоб UI не вгадував permissions.
+
+#### R10a. Порядок авторів: create, correction, backfill і merge
+
+Ручний порядок авторів входить у scope 8e. Це погоджена цільова поведінка, а не
+опис уже реалізованої можливості.
+
+- `position` належить зв'язку `WorkAuthor`, не глобальному `Author`. Для всього
+  списку одного Work позиції утворюють послідовність `0, 1, 2, …` без пропусків і
+  повторів; нумерація не починається заново для кожної ролі. Роль зберігається
+  окремо й не перевизначає ручний порядок.
+- У create Work і при заміні `authors` через PATCH єдине джерело порядку —
+  порядок елементів масиву. Сервер сам призначає `position`; клієнт не передає
+  паралельну нумерацію. Чинний вибір `authorId` або нового `name` зберігається:
+  перестановка не перейменовує глобальний Author і не об'єднує тезок за ім'ям.
+- Ідентичність зв'язку лишається парою `authorId + role` у межах Work. Один Author
+  у різних ролях може мати окремі позиції; `position` не замінює цю ідентичність.
+- Для старих зв'язків backfill відтворює нинішній видимий порядок мапера:
+  `AUTHOR → CO_AUTHOR → EDITOR → ILLUSTRATOR`, далі порівняння імен українською
+  (`localeCompare(..., 'uk')`), при рівності — стабільний порядок за `authorId`.
+  Історичний порядок введення не вигадується. Відповідність backfill цьому
+  компаратору перевіряється на legacy-даних; не можна мовчки підмінити його
+  сортуванням за default collation БД.
+- При merge спочатку лишається весь список target у його порядку, потім
+  додаються відсутні на target пари `authorId + role` у порядку source.
+  Дубль зберігає позицію target; підсумкові позиції — послідовні від нуля.
+  Консолідація і запис позицій відбуваються в тій самій merge-транзакції;
+  правила збереження Author, canonical Work і rollback не змінюються.
+- У відповідях каталогу автори повертаються за `position`, із цим полем у
+  shared response contract. Після backfill читання більше не пересортовує їх
+  за роллю або ім'ям.
 
 ### R11. Repeat-add і onboarding
 
@@ -372,6 +404,11 @@ parity tests. Import draft завжди scoped до owner; чужий id пов�
    revisions entity/id+createdAt; Translation createdById.
 5. Міграція запускається на copy production-like DB і має documented rollback.
 
+У 8e-1 також додається `WorkAuthor.position` із backfill за R10a. Після
+міграції всі наявні зв'язки мають визначені позиції; чинні create/read/merge
+шляхи та seed/fixtures оновлюються в тому самому підетапі, щоб нові записи не
+порушували порядок. Це не дозволяє починати PATCH endpoints або correction UI.
+
 `CatalogRevision.before/after` і draft payload валідовуються при записі та читанні;
 JSON не замінює shared contract. Жодного historical backfill audit не вигадується.
 
@@ -436,12 +473,18 @@ JSON не замінює shared contract. Жодного historical backfill aud
 ### 8e-1 — correction schema, audit і contracts
 
 - Additive migration/backfill, shared PATCH schemas/responses/error codes.
+- `WorkAuthor.position`, legacy backfill і сумісність чинних create/read/merge
+  шляхів за R10a; потрібні зміни seed/fixtures і shared response contract.
 - **DoD:** migration up/down strategy перевірена; DTO parity, enum parity і schema
-  tests green. **Не робити:** endpoints/UI.
+  tests green; порядок після legacy backfill, create/read і merge (target-first,
+  дубль пари, різні ролі, тезки, rollback) покрито regression-тестами.
+  **Не робити:** нові endpoints/UI.
 
 ### 8e-2 — correction permissions і API
 
 - Реалізувати PATCH transactions, permission query, revision conflict і audit.
+- Заміна списку авторів зберігає заданий масивом порядок за R10a; перестановка
+  зв'язків входить у ту саму correction-транзакцію з revision і audit.
 - **DoD:** creator/owner/stranger, concurrent edit, unique ISBN, merged Work,
   audit atomicity та rollback покриті integration/DB tests; без N+1.
 
