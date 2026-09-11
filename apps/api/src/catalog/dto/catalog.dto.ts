@@ -23,18 +23,25 @@ import {
   type AuthorRole,
   type EditionFormat,
 } from '@bookswap/shared'
-import { EachAuthorHasOneSource, IsIsbn13, IsLanguageCode } from '../../common/validators'
+import {
+  EachAuthorHasOneSource,
+  IsIsbn13,
+  IsLanguageCode,
+  IsOptionalNotNull,
+} from '../../common/validators'
 
-const trimmed = ({ value }: { value: unknown }): unknown =>
+// Експортовані: `catalog-correction.dto.ts` (PATCH) повторює ці ж перетворення
+// на тих самих полях, і саме тому бере їх звідси, а не переписує вдруге.
+export const trimmed = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value
 
 // Мова нормалізується так само, як email: « UK » з форми має стати `uk`, а не
 // бути відхиленою як невідома.
-const normalizeLanguage = ({ value }: { value: unknown }): unknown =>
+export const normalizeLanguage = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim().toLowerCase() : value
 
 // Дефіси й пробіли в ISBN — оформлення; у базу лягають самі цифри.
-const normalizeIsbn = ({ value }: { value: unknown }): unknown =>
+export const normalizeIsbn = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? normalizeIsbn13(value.trim()) : value
 
 export class CatalogSearchDto {
@@ -46,20 +53,30 @@ export class CatalogSearchDto {
 }
 
 /**
- * Автор твору: **або** id наявного, **або** імʼя нового.
+ * A Work's author: **either** an existing author's id, **or** a new one's
+ * name.
  *
- * Взаємовиключність перевіряє `@EachAuthorHasOneSource()` на самому масиві —
- * `@IsOptional()` тут глушить будь-який інший валідатор своєї властивості.
+ * The either/or check is `@EachAuthorHasOneSource()` on the array itself —
+ * `@IsOptional()` here would mute every other validator on its own property
+ * for `null` too, not just `undefined`. `authorId`, `name` and `role` mirror
+ * zod (`workAuthorInputObjectSchema`, `packages/shared`): optional but NOT
+ * nullable — hence `IsOptionalNotNull` (`common/validators.ts`), not
+ * `IsOptional`. `nameLatin` stays `IsOptional`: in zod it's
+ * `.nullable().optional()`, `null` being an explicit "clear the
+ * transliteration". `nameLatin` only means anything paired with a new
+ * `name` — combined with an existing `authorId` it is not, and must not
+ * become, a channel to edit that shared `Author` row's transliteration (see
+ * `workAuthorInputObjectSchema` in `packages/shared` for the full reasoning).
  */
 export class WorkAuthorInputDto {
-  @IsOptional()
+  @IsOptionalNotNull()
   @Transform(trimmed)
   @IsString()
   @MinLength(1)
   @MaxLength(CATALOG_LIMITS.idMax)
   authorId?: string
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @Transform(trimmed)
   @IsString()
   @MinLength(1)
@@ -73,7 +90,7 @@ export class WorkAuthorInputDto {
   @MaxLength(CATALOG_LIMITS.authorNameMax)
   nameLatin?: string | null
 
-  @IsOptional()
+  @IsOptionalNotNull()
   @IsIn(AUTHOR_ROLE, { message: 'Невідома роль автора' })
   role?: AuthorRole
 }

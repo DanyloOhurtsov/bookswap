@@ -26,6 +26,7 @@ const existingTranslation: Translation = {
   hasNotes: false,
   notes: null,
   editionCount: 2,
+  revision: 1,
 }
 
 const createdTranslation: TranslationResponse = {

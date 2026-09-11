@@ -15,6 +15,7 @@ import {
   type CatalogSearchResponse,
   type WorkDetailResponse,
 } from '@bookswap/shared'
+import { PrismaService } from '../src/prisma/prisma.service'
 import { VALID_PASSWORD, createTestApp, sessionCookie, uniqueEmail } from './auth.helpers'
 import { uniqueIsbn13 } from './helpers/unique-isbn'
 
@@ -28,10 +29,12 @@ import { uniqueIsbn13 } from './helpers/unique-isbn'
  */
 describe('Каталог (e2e)', () => {
   let app: INestApplication<App>
+  let prisma: PrismaService
   let cookie: string
 
   beforeAll(async () => {
     app = await createTestApp()
+    prisma = app.get(PrismaService)
 
     const response = await request(app.getHttpServer())
       .post(`${API_PREFIX}/auth/register`)
@@ -44,6 +47,19 @@ describe('Каталог (e2e)', () => {
 
     cookie = sessionCookie(response.headers)
   })
+
+  /** Registers a SECOND, independent user — cookie and their id. */
+  async function registerAnotherUser(): Promise<{ cookie: string; userId: string }> {
+    const email = uniqueEmail('catalog-other')
+    const response = await request(app.getHttpServer())
+      .post(`${API_PREFIX}/auth/register`)
+      .send({ email, password: VALID_PASSWORD, displayName: 'Інший користувач' })
+      .expect(201)
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true } })
+
+    return { cookie: sessionCookie(response.headers), userId: user.id }
+  }
 
   afterAll(async () => {
     await app.close()
@@ -158,6 +174,58 @@ describe('Каталог (e2e)', () => {
       expect(created.authors.map((author) => author.role)).toEqual(['AUTHOR', 'ILLUSTRATOR'])
     })
 
+    /**
+     * Stage 8e-1, R10a: порядок елементів масиву — єдине джерело `position`.
+     * Раніше мапер сортував за роллю (AUTHOR перед ILLUSTRATOR); тепер
+     * ILLUSTRATOR, надісланий першим, лишається першим — роль більше не
+     * перевизначає ручний порядок.
+     */
+    it('R10a: порядок авторів у відповіді — це порядок масиву запиту, не роль', async () => {
+      const token = marker()
+      const created = await createWork({
+        title: `Порядок ${token}`,
+        origLang: 'uk',
+        authors: [
+          { name: `Ілюстратор ${token}`, role: 'ILLUSTRATOR' },
+          { name: `Автор ${token}`, role: 'AUTHOR' },
+        ],
+      })
+
+      expect(created.authors.map((author) => author.role)).toEqual(['ILLUSTRATOR', 'AUTHOR'])
+      expect(created.authors.map((author) => author.position)).toEqual([0, 1])
+    })
+
+    /**
+     * Stage 8e-1, R10a: `dedupeAuthorLinks` (`catalog.service.ts`) removes a
+     * repeated (authorId, role) pair BEFORE `position` gets assigned — which
+     * is exactly why the dropped duplicate leaves no gap in the sequence.
+     */
+    it('R10a: повторна пара authorId+role у запиті — дедуп без пропусків у position', async () => {
+      const token = marker()
+      const existing = await createWork({
+        title: `Спільний автор ${token}`,
+        origLang: 'uk',
+        authors: [{ name: `Той самий автор ${token}` }],
+      })
+      const authorId = existing.authors[0]?.id
+
+      const created = await createWork({
+        title: `Дубль пари ${token}`,
+        origLang: 'uk',
+        authors: [
+          { authorId, role: 'AUTHOR' },
+          { name: `Другий автор ${token}` },
+          { authorId, role: 'AUTHOR' },
+        ],
+      })
+
+      // The duplicate does not create a second link — two authors, not three.
+      expect(created.authors).toHaveLength(2)
+      expect(created.authors[0]?.id).toBe(authorId)
+      // Positions stay sequential 0, 1 — the dropped duplicate leaves no gap.
+      expect(created.authors.map((author) => author.position)).toEqual([0, 1])
+    })
+
     it('неіснуючий автор — 404, твір не створюється', async () => {
       const token = marker()
       const response = await request(app.getHttpServer())
@@ -227,6 +295,8 @@ describe('Каталог (e2e)', () => {
       expect(translation.sourceLang).toBe('en')
       expect(translation.hasNotes).toBe(true)
       expect(translation.editionCount).toBe(0)
+      // Stage 8e-1, R9: щойно створена сутність починає з revision 1.
+      expect(translation.revision).toBe(1)
 
       const editionResponse = await request(app.getHttpServer())
         .post(url(`/works/${work.work.id}/editions`))
@@ -246,6 +316,52 @@ describe('Каталог (e2e)', () => {
       // Мова й перекладач рахуються з перекладу, а не приходять у запиті.
       expect(edition.lang).toBe('uk')
       expect(edition.translator).toBe('Олена Оніщук')
+      expect(edition.revision).toBe(1)
+      expect(work.work.revision).toBe(1)
+    })
+
+    /**
+     * Stage 8e-1, R9: `Translation.createdById` is who called
+     * `POST /works/:id/translations`, not `Work.createdById` — R8's ownership
+     * grants Translation-edit rights by the Translation's own creator (or by
+     * owning a Copy of one of its Editions), and that only works if the
+     * creator recorded is the actual caller, not whoever happened to create
+     * the parent Work.
+     */
+    it('R9: creator нового Translation — поточний користувач, навіть якщо Work створила інша людина', async () => {
+      const token = marker()
+      const other = await registerAnotherUser()
+
+      const work = await createWork({
+        title: `Чужий твір ${token}`,
+        origLang: 'en',
+        authors: [{ name: `Автор ${token}` }],
+      })
+
+      const translationResponse = await request(app.getHttpServer())
+        .post(url(`/works/${work.work.id}/translations`))
+        .set('Cookie', other.cookie)
+        .send({ translator: 'Хтось Інший', lang: 'uk', sourceLang: 'en' })
+        .expect(201)
+
+      const { translation } = translationResponseSchema.parse(translationResponse.body)
+
+      const [workRow, translationRow] = await Promise.all([
+        prisma.work.findUniqueOrThrow({
+          where: { id: work.work.id },
+          select: { createdById: true },
+        }),
+        prisma.translation.findUniqueOrThrow({
+          where: { id: translation.id },
+          select: { createdById: true },
+        }),
+      ])
+
+      // Work was created through the shared top-level `cookie`; the
+      // Translation through `other.cookie` — the creator recorded must be
+      // the caller who made THIS request, not the Work's creator.
+      expect(translationRow.createdById).toBe(other.userId)
+      expect(translationRow.createdById).not.toBe(workRow.createdById)
     })
 
     it('видання мовою оригіналу: translationId = null → мова з твору', async () => {

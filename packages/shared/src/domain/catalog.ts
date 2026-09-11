@@ -19,3 +19,14 @@ export const EDITION_FORMAT = ['HARDCOVER', 'PAPERBACK', 'POCKET'] as const
 export const editionFormatSchema = z.enum(EDITION_FORMAT)
 
 export type EditionFormat = z.infer<typeof editionFormatSchema>
+
+/**
+ * Stage 8e-1, R9: which catalog entity a `CatalogRevision` audit row describes.
+ * Mirrors the Prisma enum `CatalogEntityType` — parity checked the same way as
+ * the enums above (`apps/api/src/common/enum-parity.spec.ts`).
+ */
+export const CATALOG_ENTITY_TYPE = ['WORK', 'TRANSLATION', 'EDITION'] as const
+
+export const catalogEntityTypeSchema = z.enum(CATALOG_ENTITY_TYPE)
+
+export type CatalogEntityType = z.infer<typeof catalogEntityTypeSchema>

@@ -100,14 +100,50 @@ describe('CreateWorkDto ↔ createWorkRequestSchema', () => {
   })
 
   /**
-   * Розбіжність, зафіксована навмисно: механізми поводяться з невідомими полями
-   * по-різному — zod їх зрізає, `forbidNonWhitelisted` відхиляє весь запит.
-   * Обидва результати безпечні (зайве поле не доїжджає до БД у жодному разі),
-   * тому вирівнювати їх немає сенсу — але мовчати про різницю не можна.
+   * `createWorkRequestSchema` itself still strips unknown top-level fields
+   * rather than rejecting them (unlike its Stage 8e-1 PATCH counterpart,
+   * `workPatchRequestSchema` — see `catalog-correction.ts`, deliberately kept
+   * separate so this create contract's behavior doesn't change silently). The
+   * DTO's own `forbidNonWhitelisted` still refuses the request either way, so
+   * this only documents where the two mechanisms diverge for CREATE, not a
+   * gap either one has.
    */
   it('невідомі поля: zod зрізає, DTO відхиляє — до Prisma вони не доїжджають ніяк', () => {
     expect(createWorkRequestSchema.parse({ ...work, ratingAvg: 5 })).not.toHaveProperty('ratingAvg')
     expect(acceptedByDto(CreateWorkDto, { ...work, ratingAvg: 5 })).toBe(false)
+  })
+
+  /**
+   * Stage 8e-1: `authorId`/`name`/`role` are optional but NOT nullable in
+   * `workAuthorInputSchema` — `nameLatin` is the one nullable exception. The
+   * DTO used to accept `null` here regardless (`@IsOptional()` treats `null`
+   * the same as "omitted"), which was a real gap against CREATE's own already-
+   * agreed zod contract, not a new rule — see `WorkAuthorInputDto`
+   * (`IsOptionalNotNull`, `common/validators.ts`).
+   */
+  it('автор: authorId/name/role — null там, де zod його забороняє, DTO теж відхиляє', () => {
+    expectAgreement(CreateWorkDto, createWorkRequestSchema, [
+      {
+        name: 'authorId null',
+        payload: { ...work, authors: [{ authorId: null, name: 'X' }] },
+        valid: false,
+      },
+      {
+        name: 'name null (з authorId)',
+        payload: { ...work, authors: [{ authorId: 'a-1', name: null }] },
+        valid: false,
+      },
+      {
+        name: 'role null',
+        payload: { ...work, authors: [{ name: 'X', role: null }] },
+        valid: false,
+      },
+      {
+        name: 'nameLatin null — дозволено, це «прибрати транслітерацію»',
+        payload: { ...work, authors: [{ name: 'X', nameLatin: null }] },
+        valid: true,
+      },
+    ])
   })
 })
 

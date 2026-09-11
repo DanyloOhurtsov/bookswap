@@ -1,4 +1,4 @@
-import { registerDecorator, type ValidationOptions } from 'class-validator'
+import { registerDecorator, ValidateIf, type ValidationOptions } from 'class-validator'
 import { isLanguageCode, isValidIsbn13 } from '@bookswap/shared'
 
 /**
@@ -14,6 +14,24 @@ import { isLanguageCode, isValidIsbn13 } from '@bookswap/shared'
 /** Значення, які `@IsOptional()` пропускає: «не передали» і «прибрати». */
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null
+}
+
+/**
+ * Stage 8e-1: «поле PATCH — необов'язкове, але НЕ nullable».
+ *
+ * `@IsOptional()` (як і `isAbsent` вище) трактує `null` так само, як
+ * `undefined`, і глушить решту валідаторів для обох. Для полів на кшталт
+ * `title`/`origLang`/`authors`, де omitted = «без змін», а `null` заборонений
+ * контрактом (zod `.partial()` додає лише `| undefined`, не `| null`), це дало
+ * б розбіжність DTO ↔ zod: DTO мовчки пропустив би `null`, схема — впала.
+ *
+ * `@ValidateIf` пропускає решту декораторів лише для `undefined`; на `null`
+ * (і на будь-яке інше значення) звичайні валідатори виконуються — і `null` їм
+ * не подобається (`@IsString(null)` тощо), тож він падає саме там, де й
+ * повинен.
+ */
+export function IsOptionalNotNull(): PropertyDecorator {
+  return ValidateIf((_object: object, value: unknown) => value !== undefined)
 }
 
 export function IsLanguageCode(options?: ValidationOptions) {

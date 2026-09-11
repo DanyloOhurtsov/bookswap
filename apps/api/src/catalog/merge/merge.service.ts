@@ -244,23 +244,25 @@ export class MergeService {
   }
 
   /**
-   * TD-06: consolidates `WorkAuthor` links during a merge.
+   * TD-06 + Stage 8e-1 R10a: consolidates `WorkAuthor` links during a merge,
+   * `position` included.
    *
    * A link's identity is the pair (`authorId`, `role`): the same author in a
    * different role (e.g. author and also illustrator) is two separate links,
    * and both must survive. `Author` itself and the source `Work` are never
    * deleted — only `WorkAuthor` rows are touched.
    *
+   * R10a order: the target's whole list keeps its own order and its own
+   * `position` values untouched — they are already a gapless `0, 1, …` and
+   * stay the front of the combined list. Rows the target doesn't have yet
+   * (`toMove`) come from the source in the source's own order (`orderBy:
+   * position`) and are appended starting at `targetLinks.length`, so the
+   * result is still gapless. A duplicate (already on target) keeps the
+   * target's position and contributes nothing new — creating a second
+   * identical link would violate the PK `(workId, authorId, role)` anyway.
+   *
    * No query per author: two `findMany` (one per side) plus one `createMany`
    * and one `deleteMany`, regardless of how many authors a work has.
-   *
-   * Rows the target doesn't have yet move over (`createMany` on the target).
-   * Rows that match an (`authorId`, `role`) already on the target are
-   * duplicates: creating a second identical link would violate the PK
-   * `(workId, authorId, role)`, so there's simply no `createMany` entry for
-   * them. Either way, the source row must stop existing separately from the
-   * canonical work, so every remaining source link is removed with one final
-   * `deleteMany` — whatever didn't get deduplicated has already moved.
    */
   private async consolidateWorkAuthors(
     tx: TransactionClient,
@@ -271,10 +273,12 @@ export class MergeService {
       tx.workAuthor.findMany({
         where: { workId: sourceWorkId },
         select: { authorId: true, role: true },
+        orderBy: { position: 'asc' },
       }),
       tx.workAuthor.findMany({
         where: { workId: targetWorkId },
         select: { authorId: true, role: true },
+        orderBy: { position: 'asc' },
       }),
     ])
 
@@ -285,10 +289,11 @@ export class MergeService {
 
     if (toMove.length > 0) {
       await tx.workAuthor.createMany({
-        data: toMove.map((link) => ({
+        data: toMove.map((link, index) => ({
           workId: targetWorkId,
           authorId: link.authorId,
           role: link.role,
+          position: targetLinks.length + index,
         })),
       })
     }

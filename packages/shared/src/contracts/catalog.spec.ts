@@ -142,6 +142,7 @@ describe('проєкції', () => {
       hasNotes: true,
       notes: null,
       editionCount: 2,
+      revision: 1,
       score: 4.9,
       ratingAvg: 4.9,
     })
@@ -163,6 +164,7 @@ describe('проєкції', () => {
       format: 'PAPERBACK',
       lang: 'en',
       translator: null,
+      revision: 1,
     })
 
     expect(parsed.lang).toBe('en')
@@ -179,6 +181,7 @@ describe('searchCandidatesResponseSchema', () => {
       firstPubYear: 2003,
       description: null,
       createdAt: new Date().toISOString(),
+      revision: 1,
     },
     authors: [],
     translations: [],

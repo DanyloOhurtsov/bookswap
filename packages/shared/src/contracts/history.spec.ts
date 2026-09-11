@@ -118,6 +118,7 @@ describe('historyCopySchema', () => {
       format: 'HARDCOVER',
       lang: 'en',
       translator: null,
+      revision: 1,
     },
     work: {
       id: 'work-1',
@@ -126,6 +127,7 @@ describe('historyCopySchema', () => {
       firstPubYear: 2003,
       description: null,
       createdAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
     },
     authors: [],
   }

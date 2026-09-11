@@ -9,10 +9,13 @@ export {
 export { VISIBILITY, visibilitySchema, type Visibility } from './domain/visibility'
 export {
   AUTHOR_ROLE,
+  CATALOG_ENTITY_TYPE,
   EDITION_FORMAT,
   authorRoleSchema,
+  catalogEntityTypeSchema,
   editionFormatSchema,
   type AuthorRole,
+  type CatalogEntityType,
   type EditionFormat,
 } from './domain/catalog'
 export {
@@ -183,6 +186,30 @@ export {
   type WorkDetailResponse,
   type WorkMergedDetails,
 } from './contracts/catalog'
+export {
+  catalogRevisionSnapshotSchemas,
+  editionPatchRequestSchema,
+  editionPatchResponseSchema,
+  editionRevisionSnapshotSchema,
+  expectedRevisionSchema,
+  translationPatchRequestSchema,
+  translationPatchResponseSchema,
+  translationRevisionSnapshotSchema,
+  workPatchRequestSchema,
+  workPatchResponseSchema,
+  workRevisionAuthorSchema,
+  workRevisionSnapshotSchema,
+  type EditionPatchRequest,
+  type EditionPatchResponse,
+  type EditionRevisionSnapshot,
+  type TranslationPatchRequest,
+  type TranslationPatchResponse,
+  type TranslationRevisionSnapshot,
+  type WorkPatchRequest,
+  type WorkPatchResponse,
+  type WorkRevisionAuthor,
+  type WorkRevisionSnapshot,
+} from './contracts/catalog-correction'
 export {
   COPY_ENTRY_METHOD,
   LIBRARY_LIMITS,
