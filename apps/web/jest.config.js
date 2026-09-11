@@ -13,6 +13,11 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: '.',
   testRegex: '.*\\.spec\\.tsx?$',
+  // jest-haste-map crawls the whole rootDir to build its module map before any
+  // test file is even selected — testPathIgnorePatterns runs too late to help.
+  // Without this, a concurrent `next build` writing to apps/web/.next races the
+  // crawler's read of .next/package.json and throws ENOENT.
+  modulePathIgnorePatterns: ['<rootDir>/\\.next/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
