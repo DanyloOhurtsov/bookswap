@@ -1,4 +1,14 @@
-import type { AuthorRole, Edition, Translation, Work, WorkAuthor } from '@bookswap/shared'
+import type {
+  AuthorRole,
+  Edition,
+  EditionRevisionSnapshot,
+  Translation,
+  TranslationRevisionSnapshot,
+  ViewerCapabilities,
+  Work,
+  WorkAuthor,
+  WorkRevisionSnapshot,
+} from '@bookswap/shared'
 import type {
   AuthorModel,
   EditionModel,
@@ -145,4 +155,123 @@ export function byEditionOrder(one: Edition, other: Edition): number {
     (one.publisher ?? '').localeCompare(other.publisher ?? '', 'uk') ||
     one.id.localeCompare(other.id)
   )
+}
+
+export interface ViewerOwnedEditionRow {
+  id: string
+  createdById: string
+  translationId: string | null
+  /** Pre-filtered to `ownerId: <viewer>` at the query — see `CatalogService.getWork`. */
+  copies: { id: string }[]
+}
+
+export interface ViewerTranslationRow {
+  id: string
+  createdById: string
+}
+
+/**
+ * Stage 8e-2, R8/R10: what `userId` may `PATCH` on this Work, derived from a
+ * single already-fetched row — no query of its own. `copies` on each edition
+ * is pre-filtered to this viewer's ownership at the query that produced
+ * `work`, so "owns a Copy" is just "the array isn't empty", not a second
+ * lookup.
+ */
+export function toViewerCapabilities(
+  userId: string,
+  work: {
+    createdById: string
+    editions: ViewerOwnedEditionRow[]
+    translations: ViewerTranslationRow[]
+  },
+): ViewerCapabilities {
+  const ownedEditionIds = new Set(
+    work.editions.filter((edition) => edition.copies.length > 0).map((edition) => edition.id),
+  )
+
+  const canEditWork = work.createdById === userId || ownedEditionIds.size > 0
+
+  const editableEditionIds = work.editions
+    .filter((edition) => edition.createdById === userId || ownedEditionIds.has(edition.id))
+    .map((edition) => edition.id)
+
+  // R8: a Translation is editable through ownership of a Copy of ANY Edition
+  // that references it — not just one.
+  const ownedTranslationIds = new Set(
+    work.editions
+      .filter((edition) => edition.translationId !== null && ownedEditionIds.has(edition.id))
+      .map((edition) => edition.translationId as string),
+  )
+
+  const editableTranslationIds = work.translations
+    .filter(
+      (translation) =>
+        translation.createdById === userId || ownedTranslationIds.has(translation.id),
+    )
+    .map((translation) => translation.id)
+
+  return { canEditWork, editableTranslationIds, editableEditionIds }
+}
+
+/** Stage 8e-2, R9: full editable-metadata snapshot for `CatalogRevision.before`/`after`. */
+export function toWorkRevisionSnapshot(work: {
+  title: string
+  origLang: string
+  firstPubYear: number | null
+  description: string | null
+  authors: WorkAuthorRow[]
+}): WorkRevisionSnapshot {
+  return {
+    title: work.title,
+    origLang: work.origLang,
+    firstPubYear: work.firstPubYear,
+    description: work.description,
+    authors: toWorkAuthors(work.authors).map((author) => ({
+      authorId: author.id,
+      name: author.name,
+      nameLatin: author.nameLatin,
+      role: author.role,
+      position: author.position,
+    })),
+  }
+}
+
+export function toTranslationRevisionSnapshot(translation: {
+  translator: string
+  lang: string
+  sourceLang: string
+  year: number | null
+  isAbridged: boolean
+  hasNotes: boolean
+  notes: string | null
+}): TranslationRevisionSnapshot {
+  return {
+    translator: translation.translator,
+    lang: translation.lang,
+    sourceLang: translation.sourceLang,
+    year: translation.year,
+    isAbridged: translation.isAbridged,
+    hasNotes: translation.hasNotes,
+    notes: translation.notes,
+  }
+}
+
+export function toEditionRevisionSnapshot(edition: {
+  publisher: string | null
+  year: number | null
+  isbn13: string | null
+  pageCount: number | null
+  coverUrl: string | null
+  format: EditionModel['format']
+  translationId: string | null
+}): EditionRevisionSnapshot {
+  return {
+    publisher: edition.publisher,
+    year: edition.year,
+    isbn13: edition.isbn13,
+    pageCount: edition.pageCount,
+    coverUrl: edition.coverUrl,
+    format: edition.format,
+    translationId: edition.translationId,
+  }
 }

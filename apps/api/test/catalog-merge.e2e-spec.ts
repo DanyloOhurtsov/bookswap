@@ -476,7 +476,7 @@ describe('Мерж творів (e2e)', () => {
     })
 
     it('читання через CatalogService після мержу: автор видно на цілі, workCount правильний, джерело не рахується', async () => {
-      const { source, target } = await twoWorks()
+      const { source, target, ownerId } = await twoWorks()
       const another = await twoWorks()
       const shared = await createAuthor(`Автор кількох творів ${source}`)
 
@@ -490,7 +490,7 @@ describe('Мерж творів (e2e)', () => {
       // `getWork` is the same public method the `GET /api/v1/works/:id`
       // endpoint calls — not a re-implementation of its Prisma projection.
       // The moved author must show up on the target's own detail response.
-      const detail = await catalog.getWork(target)
+      const detail = await catalog.getWork(ownerId, target)
 
       expect(detail.authors.map((author) => author.id)).toContain(shared)
 

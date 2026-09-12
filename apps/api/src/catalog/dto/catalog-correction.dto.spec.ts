@@ -156,6 +156,30 @@ describe('PatchWorkDto ↔ workPatchRequestSchema', () => {
       },
     ])
   })
+
+  /**
+   * PO decision (Stage 8e-2, R10a): `authorId` + `nameLatin` together is
+   * rejected by both sides — even when `nameLatin` is explicitly `null`.
+   */
+  it('authors: authorId + nameLatin разом — 400 на обох сторонах, навіть nameLatin: null', () => {
+    expectAgreement(PatchWorkDto, workPatchRequestSchema, [
+      {
+        name: 'authorId + nameLatin (рядок)',
+        payload: { ...base, authors: [{ authorId: 'a-1', nameLatin: 'Htos' }] },
+        valid: false,
+      },
+      {
+        name: 'authorId + nameLatin: null',
+        payload: { ...base, authors: [{ authorId: 'a-1', nameLatin: null }] },
+        valid: false,
+      },
+      {
+        name: 'authorId сам собою — не порушує правило',
+        payload: { ...base, authors: [{ authorId: 'a-1' }] },
+        valid: true,
+      },
+    ])
+  })
 })
 
 describe('PatchTranslationDto ↔ translationPatchRequestSchema', () => {

@@ -160,3 +160,39 @@ export function EachAuthorHasOneSource(options?: ValidationOptions) {
     })
   }
 }
+
+/**
+ * PO decision (Stage 8e-2, R10a): `authorId` (existing author) and `nameLatin`
+ * are mutually exclusive on one PATCH `authors` element — REJECTED, even when
+ * `nameLatin` is explicitly `null`. Parity-tested against
+ * `authorIdExcludesNameLatin` (`@bookswap/shared`, `catalog-correction.ts`);
+ * PATCH-only, so this decorator goes on `PatchWorkDto.authors`, never on
+ * `CreateWorkDto.authors` (`WorkAuthorInputDto` itself stays shared and
+ * unchanged — see `EachAuthorHasOneSource` above for why the check lives on
+ * the array, not the element's own properties).
+ */
+export function EachAuthorIdExcludesNameLatin(options?: ValidationOptions) {
+  return (object: object, propertyName: string): void => {
+    registerDecorator({
+      name: 'eachAuthorIdExcludesNameLatin',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message:
+          'nameLatin не редагує транслітерацію наявного автора — вкажіть його лише для нового автора (без authorId)',
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown) =>
+          Array.isArray(value) &&
+          value.every((item) => {
+            if (typeof item !== 'object' || item === null) return false
+
+            const { authorId, nameLatin } = item as { authorId?: unknown; nameLatin?: unknown }
+
+            return authorId === undefined || nameLatin === undefined
+          }),
+      },
+    })
+  }
+}

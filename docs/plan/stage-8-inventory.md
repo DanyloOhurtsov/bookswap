@@ -298,11 +298,15 @@ conflict і merged Work лишають чинні canonical/error semantics.
   поширюється на `nameLatin`: `Author` — спільна сутність для всіх Work, що на
   неї посилаються, і правка метаданих одного Work не має права мовчки міняти
   її для решти. Вибір за `authorId` бере `name`/`nameLatin` наявного автора
-  такими, які вони вже є в базі; 8e-2 (сама мутація) мусить або відхиляти
-  комбінацію `authorId` + `nameLatin` як помилку, або мовчки її ігнорувати —
-  це реальний вибір письмового шляху, який цей документ навмисно залишає
-  відкритим для 8e-2 (§ Escalation), а не вирішує мовчки самою лише схемою
-  8e-1;
+  такими, які вони вже є в базі. **PO-рішення (закриває вибір, залишений
+  8e-1 відкритим для 8e-2):** `authorId` + `nameLatin` разом на одному
+  елементі — 400, навіть якщо `nameLatin: null`. Реалізовано і на zod
+  (`authorIdExcludesNameLatin`, `catalog-correction.ts`), і на
+  class-validator (`EachAuthorIdExcludesNameLatin`, `common/validators.ts`)
+  — обидва PATCH-only (`WorkAuthorInputDto`/`workAuthorInputSchema` для
+  CREATE лишаються незмінними), без нового error code: помилка йде як
+  звичайний `VALIDATION_ERROR`/400 глобального `ValidationPipe`/zod-парсингу,
+  як і решта правил цього PATCH;
 - невідоме поле верхнього рівня самого PATCH-тіла (Work/Translation/Edition)
   теж відхиляється, а не зрізається — на відміну від CREATE-контрактів
   (`createWorkRequestSchema` тощо), чия поведінка тут навмисно НЕ змінена
