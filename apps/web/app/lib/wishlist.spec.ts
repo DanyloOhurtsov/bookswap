@@ -23,10 +23,11 @@ const work: Work = {
   firstPubYear: 1840,
   description: null,
   createdAt: '2024-01-01T00:00:00.000Z',
+  revision: 1,
 }
 
 const authors: WorkAuthor[] = [
-  { id: 'author-1', name: 'Тарас Шевченко', nameLatin: null, role: 'AUTHOR' },
+  { id: 'author-1', name: 'Тарас Шевченко', nameLatin: null, role: 'AUTHOR', position: 0 },
 ]
 
 function item(overrides: Partial<WishlistItem> = {}): WishlistItem {

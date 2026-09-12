@@ -12,13 +12,16 @@ const work = {
   firstPubYear: 2003,
   description: null,
   createdAt: '2026-03-01T10:00:00.000Z',
+  revision: 1,
 }
 
 const item = {
   id: 'wish-1',
   workId: work.id,
   work,
-  authors: [{ id: 'author-1', name: 'Ґреґорі Девід Робертс', nameLatin: null, role: 'AUTHOR' }],
+  authors: [
+    { id: 'author-1', name: 'Ґреґорі Девід Робертс', nameLatin: null, role: 'AUTHOR', position: 0 },
+  ],
   createdAt: '2026-03-01T10:00:00.000Z',
 }
 

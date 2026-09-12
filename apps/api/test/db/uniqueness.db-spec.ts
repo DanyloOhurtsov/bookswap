@@ -120,11 +120,11 @@ describe('унікальні обмеження §4', () => {
     })
     const link = { workId: graph.workId, authorId: author.id }
 
-    await prisma.workAuthor.create({ data: { ...link, role: AuthorRole.AUTHOR } })
-    await prisma.workAuthor.create({ data: { ...link, role: AuthorRole.ILLUSTRATOR } })
+    await prisma.workAuthor.create({ data: { ...link, role: AuthorRole.AUTHOR, position: 0 } })
+    await prisma.workAuthor.create({ data: { ...link, role: AuthorRole.ILLUSTRATOR, position: 1 } })
 
     await expectRejection(
-      prisma.workAuthor.create({ data: { ...link, role: AuthorRole.AUTHOR } }),
+      prisma.workAuthor.create({ data: { ...link, role: AuthorRole.AUTHOR, position: 2 } }),
       /workId|authorId|role/,
     )
 

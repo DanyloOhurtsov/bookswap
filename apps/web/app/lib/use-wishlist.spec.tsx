@@ -49,10 +49,13 @@ function work(id: string, title: string): Work {
     firstPubYear: null,
     description: null,
     createdAt: '2024-01-01T00:00:00.000Z',
+    revision: 1,
   }
 }
 
-const authors: WorkAuthor[] = [{ id: 'author-1', name: 'Автор', nameLatin: null, role: 'AUTHOR' }]
+const authors: WorkAuthor[] = [
+  { id: 'author-1', name: 'Автор', nameLatin: null, role: 'AUTHOR', position: 0 },
+]
 
 function item(work0: Work): WishlistItem {
   return {

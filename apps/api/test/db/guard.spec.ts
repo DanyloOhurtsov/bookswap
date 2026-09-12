@@ -1,4 +1,9 @@
-import { assertSafeTestDatabase, parseTarget } from './guard'
+import {
+  assertIdentifierLength,
+  assertSafeScratchDatabase,
+  assertSafeTestDatabase,
+  parseTarget,
+} from './guard'
 
 const WORK = 'postgresql://bookswap:dev@localhost:5432/bookswap?schema=public'
 const TEST = 'postgresql://bookswap:dev@localhost:5432/bookswap_test?schema=public'
@@ -138,6 +143,126 @@ describe('parseTarget', () => {
       host: 'db.example.com',
       port: 6432,
       database: 'app',
+    })
+  })
+})
+
+describe('assertIdentifierLength', () => {
+  it("пропускає ім'я рівно на межі — 63 байти", () => {
+    const name = 'a'.repeat(63)
+
+    expect(() => assertIdentifierLength(name, 'X')).not.toThrow()
+  })
+
+  it("відхиляє ім'я на один байт довше межі", () => {
+    const name = 'a'.repeat(64)
+
+    expect(() => assertIdentifierLength(name, 'X')).toThrow(/64.*63-byte|63-byte.*64/)
+  })
+
+  it('counts UTF-8 bytes, not characters — Cyrillic is wider than ASCII', () => {
+    // Each Cyrillic letter is 2 bytes in UTF-8: 32 characters = 64 bytes,
+    // over the limit, even though the string's own length (JS .length) is
+    // only 32.
+    const name = 'а'.repeat(32)
+
+    expect(name).toHaveLength(32)
+    expect(() => assertIdentifierLength(name, 'X')).toThrow(/64 bytes/)
+  })
+})
+
+/**
+ * Stage 8e-1 (migration-scratch guard): pure tests, no connection at all —
+ * the same trick as `assertSafeTestDatabase` above: fake URLs are passed as
+ * plain parameters, not through `.env`/`process.env`, so these tests prove
+ * the refusal happens BEFORE any SQL, not just "usually works out that way".
+ */
+describe('assertSafeScratchDatabase', () => {
+  const DEV = 'postgresql://bookswap:dev@localhost:5432/bookswap'
+  const DIRECT = 'postgresql://bookswap:dev@localhost:5432/bookswap'
+  const SHARED_TEST = 'postgresql://bookswap:dev@localhost:5432/bookswap_test'
+  const SCRATCH = 'postgresql://bookswap:dev@localhost:5432/bookswap_migration_scratch_default_test'
+
+  function protectedTargets(overrides: Partial<Record<'dev' | 'direct' | 'shared', string>> = {}) {
+    return [
+      { label: 'DATABASE_URL (dev)', url: overrides.dev ?? DEV },
+      { label: 'DIRECT_DATABASE_URL (dev)', url: overrides.direct ?? DIRECT },
+      { label: 'TEST_DATABASE_URL (shared)', url: overrides.shared ?? SHARED_TEST },
+    ]
+  }
+
+  it('приймає валідний scratch-target, відмінний від усіх захищених', () => {
+    expect(assertSafeScratchDatabase(SCRATCH, 'scratch', protectedTargets())).toEqual({
+      host: 'localhost',
+      port: 5432,
+      database: 'bookswap_migration_scratch_default_test',
+    })
+  })
+
+  it('відхиляє збіг зі спільним TEST_DATABASE_URL', () => {
+    // The candidate happens to match what got passed as "shared" — exactly
+    // the risk a full normalized check catches and a substring check would not.
+    expect(() => assertSafeScratchDatabase(SHARED_TEST, 'scratch', protectedTargets())).toThrow(
+      /TEST_DATABASE_URL \(shared\)/,
+    )
+  })
+
+  it('відхиляє збіг із DATABASE_URL (dev)', () => {
+    expect(() => assertSafeScratchDatabase(DEV, 'scratch', protectedTargets())).toThrow(
+      /DATABASE_URL \(dev\)/,
+    )
+  })
+
+  it('відхиляє збіг із DIRECT_DATABASE_URL (dev)', () => {
+    const candidate = 'postgresql://other:secret@localhost:5432/bookswap'
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', protectedTargets())).toThrow(
+      /DATABASE_URL \(dev\)/,
+    )
+  })
+
+  it('еквівалентні localhost-адреси ловляться попри інший запис: 127.0.0.1, неявний порт, інший юзер', () => {
+    const candidate = 'postgresql://someone:else@127.0.0.1/bookswap_test?sslmode=require'
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', protectedTargets())).toThrow(
+      /TEST_DATABASE_URL \(shared\)/,
+    )
+  })
+
+  it('еквівалентні localhost-адреси: ::1 проти localhost', () => {
+    const candidate = 'postgresql://u:p@[::1]:5432/bookswap'
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', protectedTargets())).toThrow(
+      /DATABASE_URL \(dev\)/,
+    )
+  })
+
+  it('відхиляє службову базу навіть без жодного збігу з protectedTargets', () => {
+    const candidate = 'postgresql://u:p@localhost:5432/postgres'
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', [])).toThrow(
+      /reserved system database/,
+    )
+  })
+
+  it('відхиляє віддалений хост', () => {
+    const candidate = 'postgresql://u:p@db.prod.example.com:5432/bookswap_migration_scratch_test'
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', [])).toThrow(/localhost/)
+  })
+
+  it("відхиляє ім'я бази за межею довжини ідентифікатора PostgreSQL — ДО SQL", () => {
+    const longName = `bookswap_migration_scratch_${'x'.repeat(40)}_test`
+    const candidate = `postgresql://u:p@localhost:5432/${longName}`
+
+    expect(() => assertSafeScratchDatabase(candidate, 'scratch', [])).toThrow(/63-byte/)
+  })
+
+  it('порожній масив protectedTargets усе одно ловить reserved і довжину, але не dev/direct/shared', () => {
+    expect(assertSafeScratchDatabase(DEV, 'scratch', [])).toEqual({
+      host: 'localhost',
+      port: 5432,
+      database: 'bookswap',
     })
   })
 })

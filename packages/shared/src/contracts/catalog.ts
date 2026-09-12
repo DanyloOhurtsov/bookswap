@@ -58,6 +58,8 @@ export const workSchema = z.object({
   firstPubYear: z.number().int().nullable(),
   description: z.string().nullable(),
   createdAt: z.iso.datetime(),
+  /** Stage 8e-1, R9: optimistic concurrency — see `expectedRevisionSchema`. */
+  revision: z.number().int().positive(),
 })
 
 export type Work = z.infer<typeof workSchema>
@@ -67,6 +69,11 @@ export const workAuthorSchema = z.object({
   name: z.string(),
   nameLatin: z.string().nullable(),
   role: authorRoleSchema,
+  /**
+   * Stage 8e-1, R10a: manual order within the work's author list. `0, 1, 2, …`
+   * without gaps or repeats across the whole list — role does not restart it.
+   */
+  position: z.number().int().nonnegative(),
 })
 
 export type WorkAuthor = z.infer<typeof workAuthorSchema>
@@ -92,6 +99,8 @@ export const translationSchema = z.object({
   notes: z.string().nullable(),
   /** §10.3: «перевидають те, що продається» — непрямий сигнал якості. */
   editionCount: z.number().int().nonnegative(),
+  /** Stage 8e-1, R9: optimistic concurrency — see `expectedRevisionSchema`. */
+  revision: z.number().int().positive(),
 })
 
 export type Translation = z.infer<typeof translationSchema>
@@ -115,6 +124,8 @@ export const editionSchema = z.object({
   format: editionFormatSchema,
   lang: z.string(),
   translator: z.string().nullable(),
+  /** Stage 8e-1, R9: optimistic concurrency — see `expectedRevisionSchema`. */
+  revision: z.number().int().positive(),
 })
 
 export type Edition = z.infer<typeof editionSchema>
@@ -255,28 +266,53 @@ export type SearchCandidatesResponse = z.infer<typeof searchCandidatesResponseSc
 // --- Створення ---------------------------------------------------------------
 
 /**
- * Автор твору: **або** id наявного, **або** імʼя нового. Рівно одне з двох.
+ * A Work's author: **either** an existing author's id, **or** a new one's
+ * name. Exactly one of the two.
  *
- * Автодедуп «є автор із таким іменем — беремо його» тут заборонений: тезки
- * трапляються, і мовчки звести двох людей в одну — гірше, ніж завести дублікат
- * (його хоч видно й можна змерджити, §6.3).
+ * Auto-deduplication ("an author with this name already exists — reuse it")
+ * is forbidden here: namesakes happen, and silently merging two different
+ * people into one is worse than a duplicate `Author` row (at least a
+ * duplicate is visible and can be merged later, §6.3).
+ *
+ * `nameLatin` only makes sense paired with `name` (a NEW author) — it sets
+ * the transliteration of the author being created. When `authorId` selects
+ * an EXISTING author instead, `nameLatin` here is NOT a channel to edit that
+ * global `Author` row's transliteration: `Author` is shared across every
+ * Work that references it, and R10 (docs/plan/stage-8-inventory.md) already
+ * forbids a catalog PATCH on one Work from silently renaming it for all the
+ * others — the same rule covers `nameLatin`. Whether the write path (8e-2)
+ * rejects `authorId` + `nameLatin` together or just ignores `nameLatin` in
+ * that case is a real, still-open choice — see R10a's `nameLatin` note.
+ *
+ * Pre-`refine()` shape below, exported so `catalog-correction.ts` (Stage
+ * 8e-1 PATCH) can build a `.strict()` variant off the same fields instead of
+ * redeclaring them. `workAuthorInputSchema` further down keeps its exact
+ * current shape and unknown-key behavior (strip) — this export changes
+ * nothing for create.
  */
-export const workAuthorInputSchema = z
-  .object({
-    authorId: idSchema.optional(),
-    name: z
-      .string()
-      .trim()
-      .min(1, 'Не вказано імʼя автора')
-      .max(CATALOG_LIMITS.authorNameMax)
-      .optional(),
-    nameLatin: z.string().trim().min(1).max(CATALOG_LIMITS.authorNameMax).nullable().optional(),
-    role: authorRoleSchema.optional(),
-  })
-  .refine(
-    (value) => (value.authorId === undefined) !== (value.name === undefined),
-    'Потрібен або authorId наявного автора, або name нового — рівно одне з двох',
-  )
+export const workAuthorInputObjectSchema = z.object({
+  authorId: idSchema.optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Не вказано імʼя автора')
+    .max(CATALOG_LIMITS.authorNameMax)
+    .optional(),
+  nameLatin: z.string().trim().min(1).max(CATALOG_LIMITS.authorNameMax).nullable().optional(),
+  role: authorRoleSchema.optional(),
+})
+
+export const AUTHOR_HAS_ONE_SOURCE_MESSAGE =
+  'Потрібен або authorId наявного автора, або name нового — рівно одне з двох'
+
+export function authorHasOneSource(value: { authorId?: string; name?: string }): boolean {
+  return (value.authorId === undefined) !== (value.name === undefined)
+}
+
+export const workAuthorInputSchema = workAuthorInputObjectSchema.refine(
+  authorHasOneSource,
+  AUTHOR_HAS_ONE_SOURCE_MESSAGE,
+)
 
 export type WorkAuthorInput = z.infer<typeof workAuthorInputSchema>
 

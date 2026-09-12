@@ -61,7 +61,13 @@ export async function createGraph(
   })
 
   const translation = await prisma.translation.create({
-    data: { workId: work.id, translator: 'Перекладач', lang: 'uk', sourceLang: 'en' },
+    data: {
+      workId: work.id,
+      translator: 'Перекладач',
+      lang: 'uk',
+      sourceLang: 'en',
+      createdById: ownerId,
+    },
   })
 
   const edition = await prisma.edition.create({

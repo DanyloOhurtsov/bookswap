@@ -67,6 +67,7 @@ model User {
   notifications      Notification[]
   notificationPrefs  NotificationPreference[]
   productEvents      ProductEvent[]
+  catalogRevisions   CatalogRevision[]
 
   @@index([displayName])
 }
@@ -220,6 +221,13 @@ model WorkAuthor {
   authorId String
   role     AuthorRole @default(AUTHOR)
 
+  /// Stage 8e-1, R10a: manual order within `Work.authors`. Belongs to the link,
+  /// not to `Author` — the same person keeps a separate position per role. Forms
+  /// a gapless `0, 1, 2, …` sequence per `workId`; identity of the link stays the
+  /// pair (`authorId`, `role`), unaffected by reordering.
+  ///
+  position Int
+
   work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
   author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -244,6 +252,11 @@ model Work {
   description  String?
   createdById  String
   createdAt    DateTime @default(now())
+
+  /// Stage 8e-1, R9: optimistic concurrency for `PATCH /works/:id`. Bumped by
+  /// the conditional update; a stale `expectedRevision` gets `409
+  /// CATALOG_REVISION_CONFLICT` instead of a silent overwrite.
+  revision Int @default(1)
 
   /// §6.3, мердж дублікатів: старий запис не видаляється, інакше вмирають зовнішні посилання.
   mergedIntoId String?
@@ -282,6 +295,18 @@ model Translation {
   hasNotes   Boolean @default(false)
   notes      String?
 
+  /// Stage 8e-1, R9/R8: needed for `PATCH /translations/:id` ownership (R8) —
+  /// `Translation` had no creator at all before this. No Prisma relation, same
+  /// as `Work.createdById`/`Edition.createdById` above: a plain scalar, not
+  /// enforced referential integrity.
+  ///
+  createdById String
+  /// Existing rows get migration time, not an invented historical date (CLAUDE.md).
+  createdAt   DateTime @default(now())
+
+  /// Stage 8e-1, R9: see `Work.revision`.
+  revision Int @default(1)
+
   work     Work                @relation(fields: [workId], references: [id], onDelete: Cascade)
   editions Edition[]
   ratings  TranslationRating[]
@@ -292,6 +317,7 @@ model Translation {
   ratingCount Int   @default(0)
 
   @@index([workId, lang])
+  @@index([createdById])
 }
 
 model Edition {
@@ -308,6 +334,9 @@ model Edition {
   createdById   String
   createdAt     DateTime      @default(now())
 
+  /// Stage 8e-1, R9: see `Work.revision`.
+  revision Int @default(1)
+
   work        Work         @relation(fields: [workId], references: [id], onDelete: Cascade)
   translation Translation? @relation(fields: [translationId], references: [id])
   copies      Copy[]
@@ -320,6 +349,46 @@ enum EditionFormat {
   HARDCOVER
   PAPERBACK
   POCKET
+}
+
+enum CatalogEntityType {
+  WORK
+  TRANSLATION
+  EDITION
+}
+
+/// Stage 8e-1, R9: immutable audit trail for `PATCH /works/:id`,
+/// `/translations/:id`, `/editions/:id` (write path lands in 8e-2 — this model
+/// only reserves the storage and its shared contracts).
+///
+/// No FK to the catalog entity on purpose: `entityId` must outlive a future
+/// merge of the `Work`/`Translation`/`Edition` it once named (§6.3 — a merged
+/// `Work` is never deleted, but a `Translation`/`Edition` row can still move to
+/// a different `workId`), and a row here must never block or cascade from that.
+/// `actor` is the opposite case — nullable with `SetNull` — because deleting the
+/// acting `User` must not erase or corrupt an already-written history row.
+model CatalogRevision {
+  id         String            @id @default(cuid())
+  entityType CatalogEntityType
+  entityId   String
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// Full snapshots of the entity's editable metadata (packages/shared
+  /// `catalogRevisionSnapshotSchemas`) — for `Work`, author links and their
+  /// order included. Not the public read response: no derived permissions or
+  /// rating aggregates.
+  before Json
+  after  Json
+
+  fromRevision Int
+  toRevision   Int
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId])
 }
 
 /// docs/plan/stage-7.md, R3: кеш відповідей зовнішнього ISBN-провайдера (§6.3

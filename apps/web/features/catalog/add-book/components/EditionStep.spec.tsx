@@ -28,6 +28,7 @@ const createdEdition: EditionResponse = {
     format: 'HARDCOVER',
     lang: 'uk',
     translator: null,
+    revision: 1,
   },
 }
 

@@ -37,6 +37,7 @@ function loanRow(overrides: Partial<LoanRow> = {}): LoanRow {
         pageCount: 800,
         coverUrl: null,
         format: 'HARDCOVER',
+        revision: 1,
         translation: { lang: 'uk', translator: 'Любов Пилаєва' },
         work: {
           id: 'work-1',
@@ -45,8 +46,13 @@ function loanRow(overrides: Partial<LoanRow> = {}): LoanRow {
           firstPubYear: 2003,
           description: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          revision: 1,
           authors: [
-            { role: 'AUTHOR', author: { id: 'a-1', name: 'Ґреґорі Робертс', nameLatin: null } },
+            {
+              role: 'AUTHOR',
+              position: 0,
+              author: { id: 'a-1', name: 'Ґреґорі Робертс', nameLatin: null },
+            },
           ],
         },
       },

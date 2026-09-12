@@ -77,7 +77,11 @@ describe('Мерж творів (e2e)', () => {
     authorId: string,
     role: AuthorRole = 'AUTHOR',
   ): Promise<void> {
-    await prisma.workAuthor.create({ data: { workId, authorId, role } })
+    // Stage 8e-1, R10a: `position` — сервер призначає за порядком додавання;
+    // тут це просто «наступний вільний номер» для цього твору.
+    const position = await prisma.workAuthor.count({ where: { workId } })
+
+    await prisma.workAuthor.create({ data: { workId, authorId, role, position } })
   }
 
   async function authorLinks(workId: string): Promise<{ authorId: string; role: AuthorRole }[]> {
@@ -85,6 +89,17 @@ describe('Мерж творів (e2e)', () => {
       where: { workId },
       select: { authorId: true, role: true },
       orderBy: [{ authorId: 'asc' }, { role: 'asc' }],
+    })
+  }
+
+  /** Stage 8e-1, R10a: за `position`, а не за `authorId`/`role` — порядок є те, що перевіряється. */
+  async function authorLinksByPosition(
+    workId: string,
+  ): Promise<{ authorId: string; role: AuthorRole; position: number }[]> {
+    return prisma.workAuthor.findMany({
+      where: { workId },
+      select: { authorId: true, role: true, position: true },
+      orderBy: { position: 'asc' },
     })
   }
 
@@ -497,8 +512,11 @@ describe('Мерж творів (e2e)', () => {
       await linkAuthor(source, sourceAuthor, 'AUTHOR')
       await linkAuthor(target, targetAuthor, 'AUTHOR')
 
-      const beforeSource = await authorLinks(source)
-      const beforeTarget = await authorLinks(target)
+      // `authorLinksByPosition`, not `authorLinks`: Stage 8e-1, R10a — a
+      // rollback must not leave `position` half-consolidated even though it
+      // isn't part of the link's identity (`authorId` + `role`).
+      const beforeSource = await authorLinksByPosition(source)
+      const beforeTarget = await authorLinksByPosition(target)
       const translationsOnSourceBefore = await prisma.translation.count({
         where: { workId: source },
       })
@@ -545,9 +563,9 @@ describe('Мерж творів (e2e)', () => {
         await failingContext.close()
       }
 
-      // WorkAuthor didn't move a single step.
-      await expect(authorLinks(source)).resolves.toEqual(beforeSource)
-      await expect(authorLinks(target)).resolves.toEqual(beforeTarget)
+      // WorkAuthor didn't move a single step — position included.
+      await expect(authorLinksByPosition(source)).resolves.toEqual(beforeSource)
+      await expect(authorLinksByPosition(target)).resolves.toEqual(beforeTarget)
 
       // Not just WorkAuthor — the whole transaction rolled back, the
       // translation stayed put too.
@@ -569,7 +587,9 @@ describe('Мерж творів (e2e)', () => {
 
       await merge.merge(source, target)
 
-      const afterFirstMerge = await authorLinks(target)
+      // `authorLinksByPosition`: a rejected repeat merge must not touch
+      // `position` either, even though it isn't part of the link's identity.
+      const afterFirstMerge = await authorLinksByPosition(target)
 
       await expectRefusal(
         merge.merge(source, target),
@@ -577,9 +597,37 @@ describe('Мерж творів (e2e)', () => {
       )
 
       // A rejected repeat merge is not a second consolidation pass: the
-      // target's links stay exactly as they came out of the first merge.
-      await expect(authorLinks(target)).resolves.toEqual(afterFirstMerge)
+      // target's links — and their position — stay exactly as they came out
+      // of the first merge.
+      await expect(authorLinksByPosition(target)).resolves.toEqual(afterFirstMerge)
       await expect(prisma.workAuthor.count({ where: { workId: source } })).resolves.toBe(0)
+    })
+
+    /**
+     * Stage 8e-1, R10a: злиття зберігає порядок цілі й дописує решту з джерела.
+     *
+     * Target: [X, Y] (position 0, 1). Source: [Y (дубль), Z] (position 0, 1).
+     * Очікуваний результат: [X, Y, Z] з послідовними position 0, 1, 2 — X і Y
+     * не зрушуються, Z дописується в кінець.
+     */
+    it('R10a: злиття лишає порядок target і дописує решту source в кінець', async () => {
+      const { source, target } = await twoWorks()
+      const x = await createAuthor(`X ${target}`)
+      const y = await createAuthor(`Y ${target}`)
+      const z = await createAuthor(`Z ${source}`)
+
+      await linkAuthor(target, x, 'AUTHOR')
+      await linkAuthor(target, y, 'AUTHOR')
+      await linkAuthor(source, y, 'AUTHOR')
+      await linkAuthor(source, z, 'AUTHOR')
+
+      await merge.merge(source, target)
+
+      await expect(authorLinksByPosition(target)).resolves.toEqual([
+        { authorId: x, role: 'AUTHOR', position: 0 },
+        { authorId: y, role: 'AUTHOR', position: 1 },
+        { authorId: z, role: 'AUTHOR', position: 2 },
+      ])
     })
   })
 })

@@ -17,11 +17,13 @@ import type {
 
 export type WorkRow = Pick<
   WorkModel,
-  'id' | 'title' | 'origLang' | 'firstPubYear' | 'description' | 'createdAt'
+  'id' | 'title' | 'origLang' | 'firstPubYear' | 'description' | 'createdAt' | 'revision'
 >
 
 export interface WorkAuthorRow {
   role: AuthorRole
+  /** Stage 8e-1, R10a: manual order — the sole ordering key, see `toWorkAuthors`. */
+  position: number
   author: Pick<AuthorModel, 'id' | 'name' | 'nameLatin'>
 }
 
@@ -36,6 +38,7 @@ export type TranslationRow = Pick<
   | 'isAbridged'
   | 'hasNotes'
   | 'notes'
+  | 'revision'
 >
 
 export type EditionRow = Pick<
@@ -49,6 +52,7 @@ export type EditionRow = Pick<
   | 'pageCount'
   | 'coverUrl'
   | 'format'
+  | 'revision'
 > & {
   translation: Pick<TranslationModel, 'lang' | 'translator'> | null
 }
@@ -61,33 +65,25 @@ export function toWork(work: WorkRow): Work {
     firstPubYear: work.firstPubYear,
     description: work.description,
     createdAt: work.createdAt.toISOString(),
+    revision: work.revision,
   }
 }
 
 /**
- * Ролі мають природний порядок: спершу автор, потім співавтор, і аж тоді
- * редактор з ілюстратором. Без явного сортування порядок диктувала б БД, і той
- * самий твір показувався б по-різному на різних сторінках.
+ * Stage 8e-1, R10a: `position` — єдине джерело порядку. Роль більше не задає
+ * власне сортування (вона й раніше не була ідентичністю зв'язку, лише
+ * первинним тай-брейком) — після backfill і create/merge, що призначають
+ * `position` самі, читання його більше не пересортовує.
  */
-const ROLE_ORDER: Readonly<Record<AuthorRole, number>> = {
-  AUTHOR: 0,
-  CO_AUTHOR: 1,
-  EDITOR: 2,
-  ILLUSTRATOR: 3,
-}
-
 export function toWorkAuthors(rows: WorkAuthorRow[]): WorkAuthor[] {
   return [...rows]
-    .sort(
-      (one, other) =>
-        ROLE_ORDER[one.role] - ROLE_ORDER[other.role] ||
-        one.author.name.localeCompare(other.author.name, 'uk'),
-    )
+    .sort((one, other) => one.position - other.position)
     .map((row) => ({
       id: row.author.id,
       name: row.author.name,
       nameLatin: row.author.nameLatin,
       role: row.role,
+      position: row.position,
     }))
 }
 
@@ -103,6 +99,7 @@ export function toTranslation(translation: TranslationRow, editionCount: number)
     hasNotes: translation.hasNotes,
     notes: translation.notes,
     editionCount,
+    revision: translation.revision,
   }
 }
 
@@ -127,6 +124,7 @@ export function toEdition(edition: EditionRow, work: Pick<WorkModel, 'origLang'>
     format: edition.format,
     lang: edition.translation?.lang ?? work.origLang,
     translator: edition.translation?.translator ?? null,
+    revision: edition.revision,
   }
 }
 

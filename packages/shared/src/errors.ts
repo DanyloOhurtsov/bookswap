@@ -82,6 +82,18 @@ export const API_ERROR_CODES = {
    * error.
    */
   WORK_MERGED: 'WORK_MERGED',
+  /**
+   * Stage 8e-1/8e-2, R9: `PATCH /works|translations|editions/:id` надіслано зі
+   * застарілим `expectedRevision` (HTTP 409). Клієнт отримує код і свіжу
+   * сутність для повторного рішення — без silent overwrite.
+   */
+  CATALOG_REVISION_CONFLICT: 'CATALOG_REVISION_CONFLICT',
+  /**
+   * Stage 8e-1/8e-2, R8: людина не є creator сутності й не володіє жодним `Copy`,
+   * що дає право редагувати (HTTP 403). Право володіння не дає права видаляти,
+   * мержити чи переносити сутність до іншого Work.
+   */
+  CATALOG_EDIT_FORBIDDEN: 'CATALOG_EDIT_FORBIDDEN',
 
   // --- ISBN lookup (§6.3, §11, docs/plan/stage-7.md 7b) -----------------------
   /**

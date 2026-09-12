@@ -9,6 +9,7 @@ const work = {
   firstPubYear: 1937,
   description: null,
   createdAt: new Date('2026-01-01T12:00:00.000Z'),
+  revision: 1,
 }
 
 function editionRow(overrides: Partial<EditionRow> = {}): EditionRow {
@@ -23,6 +24,7 @@ function editionRow(overrides: Partial<EditionRow> = {}): EditionRow {
     coverUrl: null,
     format: 'PAPERBACK',
     translation: { lang: 'uk', translator: 'Олена Оніщук' },
+    revision: 1,
     ...overrides,
   }
 }
@@ -41,21 +43,35 @@ describe('toWork', () => {
 })
 
 describe('toWorkAuthors', () => {
-  it('упорядковує за роллю, потім за іменем — сторінки не мають розходитися', () => {
+  it('упорядковує за position — єдиним джерелом порядку (R10a)', () => {
     const authors = toWorkAuthors([
-      { role: 'ILLUSTRATOR', author: { id: 'a-3', name: 'Ярина', nameLatin: null } },
-      { role: 'AUTHOR', author: { id: 'a-2', name: 'Богдан', nameLatin: null } },
-      { role: 'AUTHOR', author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
+      { role: 'ILLUSTRATOR', position: 2, author: { id: 'a-3', name: 'Ярина', nameLatin: null } },
+      { role: 'AUTHOR', position: 1, author: { id: 'a-2', name: 'Богдан', nameLatin: null } },
+      { role: 'AUTHOR', position: 0, author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
     ])
 
     expect(authors.map((author) => author.name)).toEqual(['Андрій', 'Богдан', 'Ярина'])
-    expect(authors.map((author) => author.role)).toEqual(['AUTHOR', 'AUTHOR', 'ILLUSTRATOR'])
+    expect(authors.map((author) => author.position)).toEqual([0, 1, 2])
+  })
+
+  /**
+   * R10a: роль не перевизначає ручний порядок. Раніше `toWorkAuthors` сортувала
+   * спершу за роллю — це навмисно більше не так: клієнт міг поставити
+   * ILLUSTRATOR першим, і `position` це зберігає.
+   */
+  it('роль не перевизначає position, навіть якщо це виглядає «не за роллю»', () => {
+    const authors = toWorkAuthors([
+      { role: 'AUTHOR', position: 1, author: { id: 'a-2', name: 'Богдан', nameLatin: null } },
+      { role: 'ILLUSTRATOR', position: 0, author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
+    ])
+
+    expect(authors.map((author) => author.role)).toEqual(['ILLUSTRATOR', 'AUTHOR'])
   })
 
   it('роль належить звʼязку, а не людині: та сама людина може бути двічі', () => {
     const authors = toWorkAuthors([
-      { role: 'AUTHOR', author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
-      { role: 'ILLUSTRATOR', author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
+      { role: 'AUTHOR', position: 0, author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
+      { role: 'ILLUSTRATOR', position: 1, author: { id: 'a-1', name: 'Андрій', nameLatin: null } },
     ])
 
     expect(authors).toHaveLength(2)

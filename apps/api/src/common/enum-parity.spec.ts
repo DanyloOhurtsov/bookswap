@@ -1,5 +1,6 @@
 import {
   AUTHOR_ROLE,
+  CATALOG_ENTITY_TYPE,
   CHANNEL,
   CONDITION,
   COPY_STATUS,
@@ -18,6 +19,7 @@ import {
 } from '@bookswap/shared'
 import type {
   AuthorRole as SharedAuthorRole,
+  CatalogEntityType as SharedCatalogEntityType,
   Channel as SharedChannel,
   Condition as SharedCondition,
   CopyStatus as SharedCopyStatus,
@@ -30,6 +32,7 @@ import type {
 } from '@bookswap/shared'
 import {
   AuthorRole as PrismaAuthorRole,
+  CatalogEntityType as PrismaCatalogEntityType,
   Channel as PrismaChannel,
   Condition as PrismaCondition,
   CopyStatus as PrismaCopyStatus,
@@ -42,6 +45,7 @@ import {
 } from '../generated/prisma/enums'
 import type {
   AuthorRole as PrismaAuthorRoleType,
+  CatalogEntityType as PrismaCatalogEntityTypeType,
   Channel as PrismaChannelType,
   Condition as PrismaConditionType,
   CopyStatus as PrismaCopyStatusType,
@@ -71,6 +75,7 @@ const _loanStatusMatches: Equal<SharedLoanStatus, PrismaLoanStatusType> = true
 const _notificationTypeMatches: Equal<SharedNotificationType, PrismaNotificationTypeType> = true
 const _channelMatches: Equal<SharedChannel, PrismaChannelType> = true
 const _deliveryStatusMatches: Equal<SharedDeliveryStatus, PrismaDeliveryStatusType> = true
+const _catalogEntityTypeMatches: Equal<SharedCatalogEntityType, PrismaCatalogEntityTypeType> = true
 
 describe('Visibility: shared ↔ Prisma', () => {
   it('містить ті самі значення', () => {
@@ -299,6 +304,20 @@ describe('DeliveryStatus: shared ↔ Prisma', () => {
 
   it('відповідає §4.8', () => {
     expect([...DELIVERY_STATUS].sort()).toEqual(['FAILED', 'PENDING', 'SENT'])
+  })
+})
+
+describe('CatalogEntityType: shared ↔ Prisma', () => {
+  it('містить ті самі значення', () => {
+    expect([...CATALOG_ENTITY_TYPE].sort()).toEqual(Object.values(PrismaCatalogEntityType).sort())
+  })
+
+  it('типи взаємно присвоювані', () => {
+    expect(_catalogEntityTypeMatches).toBe(true)
+  })
+
+  it('відповідає ланцюгу §3: Work, Translation, Edition', () => {
+    expect([...CATALOG_ENTITY_TYPE].sort()).toEqual(['EDITION', 'TRANSLATION', 'WORK'])
   })
 })
 

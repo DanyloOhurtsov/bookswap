@@ -211,11 +211,16 @@ export class CatalogService {
         links.push({ authorId: created.id, role })
       }
 
-      // `skipDuplicates`: та сама людина в тій самій ролі двічі — це помилка
-      // заповнення форми, а не привід відхилити весь твір.
+      // R10a: `position` йде за порядком елементів запиту, і дедуп мусить
+      // статися ДО нумерації — інакше пропущена (бо дублікат) пара лишає дірку
+      // в послідовності `0, 1, 2, …`. Раніше на це покладався `skipDuplicates`
+      // у БД: та сама людина в тій самій ролі двічі — помилка заповнення форми,
+      // не привід відхилити весь твір, — але робити це на рівні БД більше не
+      // можна, бо позиція вже призначена рядку, який туди не потрапить.
+      const deduped = dedupeAuthorLinks(links)
+
       await tx.workAuthor.createMany({
-        data: links.map((link) => ({ workId: work.id, ...link })),
-        skipDuplicates: true,
+        data: deduped.map((link, position) => ({ workId: work.id, ...link, position })),
       })
 
       return work.id
@@ -225,6 +230,7 @@ export class CatalogService {
   }
 
   async createTranslation(
+    userId: string,
     workId: string,
     request: CreateTranslationRequest,
   ): Promise<TranslationResponse> {
@@ -240,6 +246,7 @@ export class CatalogService {
         isAbridged: request.isAbridged ?? false,
         hasNotes: request.hasNotes ?? false,
         notes: request.notes ?? null,
+        createdById: userId,
       },
     })
 
@@ -476,4 +483,28 @@ function countEditionsPerTranslation(
 
 function notFound(message: string): ApiException {
   return new ApiException(API_ERROR_CODES.NOT_FOUND, message, HttpStatus.NOT_FOUND)
+}
+
+/**
+ * R10a: identity of a `WorkAuthor` link is the pair (`authorId`, `role`) — same
+ * key as the PK in `schema.prisma`. First occurrence wins and keeps its place
+ * in the submitted order; a later duplicate is dropped before `position` is
+ * assigned, not after — see the comment at the call site in `createWork`.
+ */
+function dedupeAuthorLinks(
+  links: { authorId: string; role: AuthorRole }[],
+): { authorId: string; role: AuthorRole }[] {
+  const seen = new Set<string>()
+  const deduped: { authorId: string; role: AuthorRole }[] = []
+
+  for (const link of links) {
+    const key = `${link.authorId}:${link.role}`
+
+    if (seen.has(key)) continue
+
+    seen.add(key)
+    deduped.push(link)
+  }
+
+  return deduped
 }

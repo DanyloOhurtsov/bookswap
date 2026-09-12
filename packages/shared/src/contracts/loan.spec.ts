@@ -44,6 +44,7 @@ const rawLoan = {
     format: 'HARDCOVER',
     lang: 'uk',
     translator: 'Любов Пилаєва',
+    revision: 1,
   },
   work: {
     id: 'work-1',
@@ -52,8 +53,9 @@ const rawLoan = {
     firstPubYear: 2003,
     description: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    revision: 1,
   },
-  authors: [{ id: 'a-1', name: 'Ґреґорі Робертс', nameLatin: null, role: 'AUTHOR' }],
+  authors: [{ id: 'a-1', name: 'Ґреґорі Робертс', nameLatin: null, role: 'AUTHOR', position: 0 }],
 }
 
 describe('loanSchema', () => {

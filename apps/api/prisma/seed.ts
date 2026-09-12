@@ -172,13 +172,17 @@ export async function seed(prisma: PrismaClient): Promise<void> {
         workId_authorId_role: { workId: work.id, authorId, role: AuthorRole.AUTHOR },
       },
       update: {},
-      create: { workId: work.id, authorId, role: AuthorRole.AUTHOR },
+      // Один автор на seed-твір — position завжди 0 (Stage 8e-1, R10a).
+      create: { workId: work.id, authorId, role: AuthorRole.AUTHOR, position: 0 },
     })
   }
 
   // --- Переклади (§4.4) -----------------------------------------------------
   // «Гобіт» навмисно має два переклади одного твору: саме на цій формі даних
   // працюватиме ранг перекладів (§10) і вибір «який брати» (§1).
+  // `createdById` — творець твору-батька: seed не моделює окрему сесію, під якою
+  // хтось додав переклад пізніше, тож найближчий чесний вибір — той самий
+  // користувач, що завів Work (Stage 8e-1, R9).
   const translations = [
     {
       id: 'seed-translation-shantaram-uk',
@@ -188,6 +192,7 @@ export async function seed(prisma: PrismaClient): Promise<void> {
       sourceLang: 'en',
       year: 2017,
       hasNotes: true,
+      createdById: 'seed-user-marta',
     },
     {
       id: 'seed-translation-hobbit-mokrovolsky',
@@ -197,6 +202,7 @@ export async function seed(prisma: PrismaClient): Promise<void> {
       sourceLang: 'en',
       year: 1985,
       isAbridged: true,
+      createdById: 'seed-user-oles',
     },
     {
       id: 'seed-translation-hobbit-oniryshkevych',
@@ -206,6 +212,7 @@ export async function seed(prisma: PrismaClient): Promise<void> {
       sourceLang: 'en',
       year: 2007,
       hasNotes: true,
+      createdById: 'seed-user-oles',
     },
   ]
 

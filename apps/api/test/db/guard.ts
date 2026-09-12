@@ -154,3 +154,102 @@ export function assertSafeTestDatabase(env: Record<string, string | undefined>):
 
   return { url, database: test.database }
 }
+
+// ---------------------------------------------------------------------------
+// Scratch-database guard (Stage 8e-1, `migration-scratch.ts`)
+//
+// A second, narrower fail-closed check for databases that get dropped and
+// recreated MID-SUITE (not just once by `global-setup.ts`): the migration
+// replay tests need their own disposable database, distinct from both the
+// dev database and the one shared `_test` database every other
+// `*.db-spec.ts` file assumes is already fully migrated. The risk profile is
+// the same as `assertSafeTestDatabase` above — a wrong target here also costs
+// destroyed data — so this reuses the same primitives (`parseTarget`,
+// `sameTarget`, `RESERVED_DATABASES`) rather than re-deriving the rules.
+// ---------------------------------------------------------------------------
+
+/**
+ * PostgreSQL's default `NAMEDATALEN` is 64 bytes, INCLUDING the identifier's
+ * terminating null byte — 63 usable bytes. A longer identifier is silently
+ * TRUNCATED by the server, for `CREATE DATABASE` and `DROP DATABASE` alike:
+ * two different intended names that happen to share the same first 63 bytes
+ * resolve to — and a `DROP` on one destroys — the exact same physical
+ * database. Refusing anything over the limit up front means no name this
+ * code ever actually sends to Postgres can be truncated in the first place;
+ * there is no need to detect a truncation collision after the fact.
+ */
+export const MAX_IDENTIFIER_BYTES = 63
+
+export function assertIdentifierLength(name: string, label: string): void {
+  const bytes = Buffer.byteLength(name, 'utf8')
+
+  if (bytes > MAX_IDENTIFIER_BYTES) {
+    throw new Error(
+      `${label}: "${name}" is ${String(bytes)} bytes, over PostgreSQL's ` +
+        `${String(MAX_IDENTIFIER_BYTES)}-byte identifier limit (NAMEDATALEN - 1) — the server ` +
+        'would silently truncate it, and the truncated name might not be the one this code checked.',
+    )
+  }
+}
+
+export interface ProtectedTarget {
+  /** Human-readable name for the error message — which real target this is. */
+  label: string
+  url: string
+}
+
+/**
+ * Refuses a scratch-database candidate that — after normalization, not as a
+ * raw string — resolves to a reserved system database, a non-`localhost`
+ * host, or any of the caller-supplied `protectedTargets` (the dev database,
+ * its direct/migration counterpart, the shared test database, …).
+ *
+ * Pure: no `process.env`, no network I/O. Callers decide which URLs are
+ * "protected" and pass them in explicitly — `migration-scratch.ts` supplies
+ * the real ones (captured before any test substitution, see
+ * `test-database.ts`), tests supply fake ones. This mirrors
+ * `assertSafeTestDatabase`'s own env-parameter shape above, for the same
+ * reason: a fail-closed check is only trustworthy if it can be exercised
+ * without a live database.
+ *
+ * A substring check (`name.includes(...)`) is deliberately NOT how this
+ * works: an arbitrary real target could legitimately contain that substring,
+ * and a truncated name wouldn't. Every candidate is instead independently
+ * re-parsed and compared as a normalized (host, port, database) triple.
+ */
+export function assertSafeScratchDatabase(
+  candidateUrl: string,
+  candidateLabel: string,
+  protectedTargets: ProtectedTarget[],
+): DatabaseTarget {
+  const candidate = parseTarget(candidateUrl, candidateLabel)
+
+  assertIdentifierLength(candidate.database, candidateLabel)
+
+  if (candidate.host !== 'localhost') {
+    throw new Error(
+      `${candidateLabel} (${describe(candidate)}): scratch databases are only allowed on ` +
+        'localhost, 127.0.0.1 or ::1',
+    )
+  }
+
+  if (RESERVED_DATABASES.has(candidate.database.toLowerCase())) {
+    throw new Error(
+      `${candidateLabel}: "${candidate.database}" is a reserved system database — refusing to ` +
+        'treat it as disposable',
+    )
+  }
+
+  for (const { label, url } of protectedTargets) {
+    const target = parseTarget(url, label)
+
+    if (sameTarget(candidate, target)) {
+      throw new Error(
+        `${candidateLabel} (${describe(candidate)}) resolves to the same database as ${label} ` +
+          `(${describe(target)}) — refusing to treat a protected database as disposable scratch`,
+      )
+    }
+  }
+
+  return candidate
+}

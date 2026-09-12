@@ -111,10 +111,11 @@ export class CatalogController {
   @Throttle(CATALOG_WRITE_LIMIT)
   @HttpCode(HttpStatus.CREATED)
   createTranslation(
+    @CurrentUser() user: UserModel,
     @Param('id') id: string,
     @Body() dto: CreateTranslationDto,
   ): Promise<TranslationResponse> {
-    return this.catalog.createTranslation(id, dto)
+    return this.catalog.createTranslation(user.id, id, dto)
   }
 
   @Post('works/:id/editions')

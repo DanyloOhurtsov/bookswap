@@ -72,12 +72,20 @@ function work(overrides: Partial<Work> = {}): Work {
     firstPubYear: 1840,
     description: null,
     createdAt: '2024-01-01T00:00:00.000Z',
+    revision: 1,
     ...overrides,
   }
 }
 
 function author(overrides: Partial<WorkAuthor> = {}): WorkAuthor {
-  return { id: 'author-1', name: 'Тарас Шевченко', nameLatin: null, role: 'AUTHOR', ...overrides }
+  return {
+    id: 'author-1',
+    name: 'Тарас Шевченко',
+    nameLatin: null,
+    role: 'AUTHOR',
+    position: 0,
+    ...overrides,
+  }
 }
 
 function edition(overrides: Partial<Edition> = {}): Edition {
@@ -93,6 +101,7 @@ function edition(overrides: Partial<Edition> = {}): Edition {
     format: 'HARDCOVER',
     lang: 'uk',
     translator: null,
+    revision: 1,
     ...overrides,
   }
 }
@@ -109,6 +118,7 @@ function translation(overrides: Partial<Translation> = {}): Translation {
     hasNotes: false,
     notes: null,
     editionCount: 0,
+    revision: 1,
     ...overrides,
   }
 }
