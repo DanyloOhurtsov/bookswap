@@ -19,6 +19,7 @@ import {
 import { CATALOG_LIMITS, EDITION_FORMAT, type EditionFormat } from '@bookswap/shared'
 import {
   EachAuthorHasOneSource,
+  EachAuthorIdExcludesNameLatin,
   IsIsbn13,
   IsLanguageCode,
   IsOptionalNotNull,
@@ -26,8 +27,8 @@ import {
 import { normalizeIsbn, normalizeLanguage, trimmed, WorkAuthorInputDto } from './catalog.dto'
 
 /**
- * Stage 8e-1: Nest DTO для `PATCH /works|translations|editions/:id`, parity
- * tested against `workPatchRequestSchema`/`translationPatchRequestSchema`/
+ * Stage 8e-1/8e-2: Nest DTO для `PATCH /works|translations|editions/:id`,
+ * parity tested against `workPatchRequestSchema`/`translationPatchRequestSchema`/
  * `editionPatchRequestSchema` (`catalog-correction.dto.spec.ts`).
  *
  * Кожне поле — точна копія відповідного поля з `catalog.dto.ts`, лише
@@ -35,6 +36,11 @@ import { normalizeIsbn, normalizeLanguage, trimmed, WorkAuthorInputDto } from '.
  * лишається не-nullable (title/origLang/authors у Work; translator/lang/
  * sourceLang/isAbridged/hasNotes у Translation; format в Edition) — див.
  * `IsOptionalNotNull` у `common/validators.ts` про те, чому.
+ *
+ * `PatchWorkDto.authors` додатково несе `@EachAuthorIdExcludesNameLatin()`
+ * (Stage 8e-2, R10a PO decision): `authorId` + `nameLatin` разом на одному
+ * елементі — 400, навіть якщо `nameLatin: null`. PATCH-only — `WorkAuthorInputDto`
+ * сам лишається спільним із `CreateWorkDto` і незмінним.
  */
 
 export class PatchWorkDto {
@@ -67,6 +73,7 @@ export class PatchWorkDto {
   @ArrayMinSize(1, { message: 'Потрібен хоча б один автор' })
   @ArrayMaxSize(CATALOG_LIMITS.authorsMax)
   @EachAuthorHasOneSource()
+  @EachAuthorIdExcludesNameLatin()
   @ValidateNested({ each: true })
   @Type(() => WorkAuthorInputDto)
   authors?: WorkAuthorInputDto[]

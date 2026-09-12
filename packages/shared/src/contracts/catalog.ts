@@ -190,11 +190,35 @@ export type CatalogSearchResponse = z.infer<typeof catalogSearchResponseSchema>
 
 // --- Читання -----------------------------------------------------------------
 
+/**
+ * Stage 8e-2, R10/R8: what the current viewer may `PATCH` on this Work,
+ * computed server-side so the client never has to guess or duplicate R8's
+ * ownership rule. `canEditWork` covers the Work itself; the two id lists name
+ * exactly which of the Work's Translations/Editions the viewer may also PATCH
+ * — a viewer can hold Edition-level rights (owns a Copy of it) without
+ * Work-level ones, and vice versa.
+ */
+export const viewerCapabilitiesSchema = z.object({
+  canEditWork: z.boolean(),
+  editableTranslationIds: z.array(z.string()),
+  editableEditionIds: z.array(z.string()),
+})
+
+export type ViewerCapabilities = z.infer<typeof viewerCapabilitiesSchema>
+
+/**
+ * `viewerCapabilities` is optional: only `GET /works/:id` and `POST /works`
+ * (Stage 8e-2) compute it for the requesting user. `SearchCandidatesResponse`
+ * (Stage 7c) reuses this exact shape for its `candidates` — a before-selection
+ * preview where "can I edit this" is not yet a question the UI asks — and
+ * omits the field rather than paying for a permission check nobody reads.
+ */
 export const workDetailResponseSchema = z.object({
   work: workSchema,
   authors: z.array(workAuthorSchema),
   translations: z.array(translationSchema),
   editions: z.array(editionSchema),
+  viewerCapabilities: viewerCapabilitiesSchema.optional(),
 })
 
 export type WorkDetailResponse = z.infer<typeof workDetailResponseSchema>
@@ -280,9 +304,12 @@ export type SearchCandidatesResponse = z.infer<typeof searchCandidatesResponseSc
  * global `Author` row's transliteration: `Author` is shared across every
  * Work that references it, and R10 (docs/plan/stage-8-inventory.md) already
  * forbids a catalog PATCH on one Work from silently renaming it for all the
- * others — the same rule covers `nameLatin`. Whether the write path (8e-2)
- * rejects `authorId` + `nameLatin` together or just ignores `nameLatin` in
- * that case is a real, still-open choice — see R10a's `nameLatin` note.
+ * others — the same rule covers `nameLatin`. PO decision (Stage 8e-2, R10a):
+ * the write path REJECTS `authorId` + `nameLatin` together — with 400, even
+ * when `nameLatin` is explicitly `null` — rather than silently ignoring it;
+ * see `strictWorkAuthorInputSchema` (`catalog-correction.ts`) for the PATCH-only
+ * refinement that enforces this (create's `workAuthorInputSchema` below is
+ * unaffected — this object schema itself stays permissive, same as before).
  *
  * Pre-`refine()` shape below, exported so `catalog-correction.ts` (Stage
  * 8e-1 PATCH) can build a `.strict()` variant off the same fields instead of

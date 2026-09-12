@@ -114,6 +114,31 @@ describe('workPatchRequestSchema', () => {
         workPatchRequestSchema.safeParse({ ...base, authors: [{ role: 'AUTHOR' }] }).success,
       ).toBe(false)
     })
+
+    /**
+     * PO decision (Stage 8e-2, R10a — replaces the choice 8e-1 left open):
+     * `authorId` + `nameLatin` together is REJECTED, even when `nameLatin` is
+     * explicitly `null`. `nameLatin` alone (with a new `name`, no `authorId`)
+     * stays valid — see the "nameLatin: optional AND nullable" test above.
+     */
+    it('rejects authorId + nameLatin together — even nameLatin: null', () => {
+      expect(
+        workPatchRequestSchema.safeParse({
+          ...base,
+          authors: [{ authorId: 'a-1', nameLatin: 'Htos' }],
+        }).success,
+      ).toBe(false)
+      expect(
+        workPatchRequestSchema.safeParse({
+          ...base,
+          authors: [{ authorId: 'a-1', nameLatin: null }],
+        }).success,
+      ).toBe(false)
+      // authorId alone (no nameLatin key at all) is unaffected.
+      expect(
+        workPatchRequestSchema.safeParse({ ...base, authors: [{ authorId: 'a-1' }] }).success,
+      ).toBe(true)
+    })
   })
 })
 

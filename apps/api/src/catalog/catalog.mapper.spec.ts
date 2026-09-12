@@ -1,4 +1,14 @@
-import { byEditionOrder, toEdition, toWork, toWorkAuthors, type EditionRow } from './catalog.mapper'
+import {
+  byEditionOrder,
+  toEdition,
+  toEditionRevisionSnapshot,
+  toTranslationRevisionSnapshot,
+  toViewerCapabilities,
+  toWork,
+  toWorkAuthors,
+  toWorkRevisionSnapshot,
+  type EditionRow,
+} from './catalog.mapper'
 import { escapeLikePattern } from './search-text'
 import type { Edition } from '@bookswap/shared'
 
@@ -127,6 +137,156 @@ describe('byEditionOrder', () => {
     ].sort(byEditionOrder)
 
     expect(sorted.map((item) => item.id)).toEqual(['b', 'c', 'a'])
+  })
+})
+
+describe('toViewerCapabilities', () => {
+  const creatorId = 'creator-1'
+  const strangerId = 'stranger-1'
+  const ownerId = 'owner-1'
+
+  it('creator: canEditWork true, and every own Edition/Translation is editable even with no Copy', () => {
+    const capabilities = toViewerCapabilities(creatorId, {
+      createdById: creatorId,
+      editions: [{ id: 'e-1', createdById: creatorId, translationId: null, copies: [] }],
+      translations: [{ id: 't-1', createdById: creatorId }],
+    })
+
+    expect(capabilities).toEqual({
+      canEditWork: true,
+      editableEditionIds: ['e-1'],
+      editableTranslationIds: ['t-1'],
+    })
+  })
+
+  it('stranger with no Copy anywhere: canEditWork false, nothing editable', () => {
+    const capabilities = toViewerCapabilities(strangerId, {
+      createdById: creatorId,
+      editions: [{ id: 'e-1', createdById: creatorId, translationId: 't-1', copies: [] }],
+      translations: [{ id: 't-1', createdById: creatorId }],
+    })
+
+    expect(capabilities).toEqual({
+      canEditWork: false,
+      editableEditionIds: [],
+      editableTranslationIds: [],
+    })
+  })
+
+  it('R8: owning a Copy of one Edition grants Work-level and that Edition/Translation-level rights, not other Editions', () => {
+    const capabilities = toViewerCapabilities(ownerId, {
+      createdById: creatorId,
+      editions: [
+        {
+          id: 'e-owned',
+          createdById: creatorId,
+          translationId: 't-owned',
+          copies: [{ id: 'c-1' }],
+        },
+        { id: 'e-other', createdById: creatorId, translationId: 't-other', copies: [] },
+      ],
+      translations: [
+        { id: 't-owned', createdById: creatorId },
+        { id: 't-other', createdById: creatorId },
+      ],
+    })
+
+    expect(capabilities).toEqual({
+      canEditWork: true,
+      editableEditionIds: ['e-owned'],
+      editableTranslationIds: ['t-owned'],
+    })
+  })
+
+  it('a Translation is editable via ANY Edition referencing it, not just the first', () => {
+    const capabilities = toViewerCapabilities(ownerId, {
+      createdById: creatorId,
+      editions: [
+        { id: 'e-1', createdById: creatorId, translationId: 'shared-t', copies: [] },
+        { id: 'e-2', createdById: creatorId, translationId: 'shared-t', copies: [{ id: 'c-1' }] },
+      ],
+      translations: [{ id: 'shared-t', createdById: creatorId }],
+    })
+
+    expect(capabilities.editableTranslationIds).toEqual(['shared-t'])
+  })
+})
+
+describe('CatalogRevision snapshots (Stage 8e-2, R9)', () => {
+  it('toWorkRevisionSnapshot captures full editable metadata, authors by position with nameLatin', () => {
+    const snapshot = toWorkRevisionSnapshot({
+      title: 'Шантарам',
+      origLang: 'en',
+      firstPubYear: 2003,
+      description: null,
+      authors: [
+        {
+          role: 'AUTHOR',
+          position: 0,
+          author: { id: 'a-1', name: 'Ґреґорі Робертс', nameLatin: 'Gregory Roberts' },
+        },
+      ],
+    })
+
+    expect(snapshot).toEqual({
+      title: 'Шантарам',
+      origLang: 'en',
+      firstPubYear: 2003,
+      description: null,
+      authors: [
+        {
+          authorId: 'a-1',
+          name: 'Ґреґорі Робертс',
+          nameLatin: 'Gregory Roberts',
+          role: 'AUTHOR',
+          position: 0,
+        },
+      ],
+    })
+  })
+
+  it('toTranslationRevisionSnapshot picks exactly the editable Translation fields', () => {
+    expect(
+      toTranslationRevisionSnapshot({
+        translator: 'Хтось',
+        lang: 'uk',
+        sourceLang: 'en',
+        year: 1985,
+        isAbridged: false,
+        hasNotes: true,
+        notes: 'нотатка',
+      }),
+    ).toEqual({
+      translator: 'Хтось',
+      lang: 'uk',
+      sourceLang: 'en',
+      year: 1985,
+      isAbridged: false,
+      hasNotes: true,
+      notes: 'нотатка',
+    })
+  })
+
+  it('toEditionRevisionSnapshot picks exactly the editable Edition fields', () => {
+    expect(
+      toEditionRevisionSnapshot({
+        publisher: 'КСД',
+        year: 2019,
+        isbn13: '9783161484100',
+        pageCount: 320,
+        coverUrl: null,
+        format: 'PAPERBACK',
+        translationId: null,
+      }),
+    ).toEqual({
+      publisher: 'КСД',
+      year: 2019,
+      isbn13: '9783161484100',
+      pageCount: 320,
+      coverUrl: null,
+      format: 'PAPERBACK',
+      translationId: null,
+    })
   })
 })
 

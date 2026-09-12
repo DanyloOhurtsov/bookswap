@@ -13,16 +13,32 @@ import {
   type CreateTranslationRequest,
   type CreateWorkRequest,
   type EditionDetailResponse,
+  type EditionPatchResponse,
   type EditionResponse,
   type TranslationListResponse,
+  type TranslationPatchResponse,
   type TranslationResponse,
   type WorkDetailResponse,
+  type WorkPatchRequest,
+  type WorkPatchResponse,
+  type EditionPatchRequest,
+  type TranslationPatchRequest,
 } from '@bookswap/shared'
 import { ApiException } from '../common/api.exception'
 import { isUniqueViolation } from '../common/prisma-errors'
 import { PrismaService } from '../prisma/prisma.service'
 import { CanonicalWorkService, workMergedConflict } from './canonical/canonical-work.service'
-import { byEditionOrder, toEdition, toTranslation, toWork, toWorkAuthors } from './catalog.mapper'
+import {
+  byEditionOrder,
+  toEdition,
+  toEditionRevisionSnapshot,
+  toTranslation,
+  toTranslationRevisionSnapshot,
+  toViewerCapabilities,
+  toWork,
+  toWorkAuthors,
+  toWorkRevisionSnapshot,
+} from './catalog.mapper'
 import { pinSimilarityThreshold, rankAuthors, rankWorks } from './catalog.search'
 import { escapeLikePattern } from './search-text'
 import { TextNormalizer } from './text-normalizer'
@@ -92,10 +108,24 @@ export class CatalogService {
     }
   }
 
-  async getWork(workId: string): Promise<WorkDetailResponse> {
+  /**
+   * `userId` powers `viewerCapabilities` (Stage 8e-2, R10) — the one extra
+   * relation this needs (`editions.copies`, filtered to `userId`) rides along
+   * on this same query, not a second lookup.
+   */
+  async getWork(userId: string, workId: string): Promise<WorkDetailResponse> {
     const work = await this.prisma.work.findUnique({
       where: { id: workId },
-      include: { ...WITH_AUTHORS, ...WITH_EDITIONS, translations: true },
+      include: {
+        ...WITH_AUTHORS,
+        translations: true,
+        editions: {
+          include: {
+            translation: true,
+            copies: { where: { ownerId: userId }, select: { id: true } },
+          },
+        },
+      },
     })
 
     if (work === null) throw notFound('Твір не знайдено')
@@ -109,6 +139,7 @@ export class CatalogService {
         toTranslation(translation, editionsPerTranslation.get(translation.id) ?? 0),
       ),
       editions: work.editions.map((edition) => toEdition(edition, work)).sort(byEditionOrder),
+      viewerCapabilities: toViewerCapabilities(userId, work),
     }
   }
 
@@ -226,7 +257,7 @@ export class CatalogService {
       return work.id
     })
 
-    return this.getWork(workId)
+    return this.getWork(userId, workId)
   }
 
   async createTranslation(
@@ -312,6 +343,341 @@ export class CatalogService {
       })
 
       return { edition: toEdition(edition, work) }
+    } catch (error) {
+      if (isUniqueViolation(error) && request.isbn13 !== undefined && request.isbn13 !== null) {
+        throw await this.isbnTaken(request.isbn13)
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * Stage 8e-2, R8/R9/R10a: Work metadata correction.
+   *
+   * `before` is read ONCE, under an explicit row lock, inside this
+   * transaction — not by a separate pre-transaction `SELECT`, and not by a
+   * conditional `UPDATE ... WHERE revision = $N` alone. Both would leave a gap
+   * a concurrent `MergeService.merge()` can land in: `merge()` moves
+   * `WorkAuthor` links onto a target and points a source at it via
+   * `mergedIntoId`, WITHOUT ever bumping either side's `revision` (see
+   * `merge.service.ts`). So a stale `mergedIntoId` check, or a revision-only
+   * guard, cannot tell "this Work was just merged/consolidated" from "nothing
+   * happened" — the write would either land silently on a now-merged Work, or
+   * the audit `before` would describe authors that were never actually there
+   * a moment before this PATCH's own change. The lock below is what actually
+   * prevents both: `FOR UPDATE` is the SAME lock `MergeService.lockWorks`
+   * takes on both sides of a merge, so this PATCH and a concurrent `merge()`
+   * serialize against each other — whichever reaches the row first wins, the
+   * other queues here until the first commits, and then reads the
+   * POST-commit state, never a torn or stale one. This is also still the R8
+   * "one permission query": the SAME locked read backs the merge check, the
+   * ownership check, the revision check, and the audit snapshot.
+   */
+  async patchWork(
+    userId: string,
+    workId: string,
+    request: WorkPatchRequest,
+  ): Promise<WorkPatchResponse> {
+    const newAuthorNames =
+      request.authors === undefined
+        ? []
+        : request.authors.flatMap((author) => (author.name === undefined ? [] : [author.name]))
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Work" WHERE "id" = ${workId} FOR UPDATE`
+
+      const before = await tx.work.findUnique({
+        where: { id: workId },
+        include: {
+          ...WITH_AUTHORS,
+          editions: {
+            select: { id: true, copies: { where: { ownerId: userId }, select: { id: true } } },
+          },
+        },
+      })
+
+      if (before === null) throw notFound('Твір не знайдено')
+
+      // R8: a write to a merged (non-canonical) Work is refused, same as
+      // `createEdition`/`createTranslation` (`CanonicalWorkService`) — the
+      // rule and its reasoning live there, not duplicated here. Checked here,
+      // under the lock, not before this transaction opened.
+      if (before.mergedIntoId !== null) {
+        throw workMergedConflict({
+          workId: before.mergedIntoId,
+          requestedWorkId: workId,
+          moved: true,
+        })
+      }
+
+      const canEdit =
+        before.createdById === userId ||
+        before.editions.some((edition) => edition.copies.length > 0)
+
+      if (!canEdit) throw forbidden()
+
+      if (before.revision !== request.expectedRevision) {
+        throw new ApiException(
+          API_ERROR_CODES.CATALOG_REVISION_CONFLICT,
+          'Твір змінено раніше — оновіть дані й спробуйте ще раз',
+          HttpStatus.CONFLICT,
+          { work: toWork(before), authors: toWorkAuthors(before.authors) },
+        )
+      }
+
+      const titleNorm =
+        request.title === undefined ? undefined : await this.normalizer.normalize(request.title, tx)
+
+      await tx.work.update({
+        where: { id: workId },
+        data: {
+          title: request.title,
+          titleNorm,
+          origLang: request.origLang,
+          firstPubYear: request.firstPubYear,
+          description: request.description,
+          revision: { increment: 1 },
+        },
+      })
+
+      // R10a: `authors` omitted — the link table is untouched. A supplied
+      // array is a FULL replacement: existing `WorkAuthor` rows are dropped
+      // and rebuilt from the submitted order, never the underlying `Author`
+      // rows (R10 — this never renames or deletes a global `Author`).
+      if (request.authors !== undefined) {
+        await this.assertAuthorsExist(request.authors, tx)
+
+        const nameNorms =
+          newAuthorNames.length === 0 ? [] : await this.normalizer.normalizeMany(newAuthorNames, tx)
+
+        let nextName = 0
+        const links: { authorId: string; role: AuthorRole }[] = []
+
+        for (const author of request.authors) {
+          const role = author.role ?? 'AUTHOR'
+
+          if (author.authorId !== undefined) {
+            links.push({ authorId: author.authorId, role })
+            continue
+          }
+
+          const nameNorm = nameNorms[nextName]
+
+          nextName += 1
+
+          if (author.name === undefined || nameNorm === undefined) {
+            throw new Error('Нормалізація імені автора не повернула значення')
+          }
+
+          const created = await tx.author.create({
+            data: { name: author.name, nameNorm, nameLatin: author.nameLatin ?? null },
+          })
+
+          links.push({ authorId: created.id, role })
+        }
+
+        // Same identity/dedup rule as `createWork` — no dedup by name, only an
+        // exact repeated (authorId, role) pair, and only BEFORE `position` is
+        // assigned (see `dedupeAuthorLinks`'s own comment).
+        const deduped = dedupeAuthorLinks(links)
+
+        await tx.workAuthor.deleteMany({ where: { workId } })
+        await tx.workAuthor.createMany({
+          data: deduped.map((link, position) => ({ workId, ...link, position })),
+        })
+      }
+
+      const after = await tx.work.findUniqueOrThrow({
+        where: { id: workId },
+        include: WITH_AUTHORS,
+      })
+
+      // Same transaction as the update above (and the author replacement, if
+      // any): a failure anywhere in this method rolls back the scalar change,
+      // the author links, AND this audit row together — never a subset.
+      await tx.catalogRevision.create({
+        data: {
+          entityType: 'WORK',
+          entityId: workId,
+          actorId: userId,
+          before: toWorkRevisionSnapshot(before),
+          after: toWorkRevisionSnapshot(after),
+          fromRevision: before.revision,
+          toRevision: after.revision,
+        },
+      })
+
+      return { work: toWork(after), authors: toWorkAuthors(after.authors) }
+    })
+  }
+
+  /**
+   * Stage 8e-2, R8/R9: same locked-read shape as {@link patchWork} (without
+   * the author list) — `before`, the ownership check, and the
+   * `expectedRevision` check all come from the ONE read taken under `FOR
+   * UPDATE`, inside this transaction, not a separate pre-transaction
+   * `SELECT`. Nothing here moves a Translation across Works without also
+   * touching `revision` (unlike `MergeService`'s effect on `Work`), so this
+   * is defense in depth for consistency with `patchWork`/`patchEdition`
+   * rather than a fix for a currently-reachable bug on this entity.
+   */
+  async patchTranslation(
+    userId: string,
+    translationId: string,
+    request: TranslationPatchRequest,
+  ): Promise<TranslationPatchResponse> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Translation" WHERE "id" = ${translationId} FOR UPDATE`
+
+      const before = await tx.translation.findUnique({
+        where: { id: translationId },
+        include: {
+          editions: {
+            select: { id: true, copies: { where: { ownerId: userId }, select: { id: true } } },
+          },
+        },
+      })
+
+      if (before === null) throw notFound('Переклад не знайдено')
+
+      const canEdit =
+        before.createdById === userId ||
+        before.editions.some((edition) => edition.copies.length > 0)
+
+      if (!canEdit) throw forbidden()
+
+      if (before.revision !== request.expectedRevision) {
+        const editionCount = await tx.edition.count({ where: { translationId } })
+
+        throw new ApiException(
+          API_ERROR_CODES.CATALOG_REVISION_CONFLICT,
+          'Переклад змінено раніше — оновіть дані й спробуйте ще раз',
+          HttpStatus.CONFLICT,
+          { translation: toTranslation(before, editionCount) },
+        )
+      }
+
+      const after = await tx.translation.update({
+        where: { id: translationId },
+        data: {
+          translator: request.translator,
+          lang: request.lang,
+          sourceLang: request.sourceLang,
+          year: request.year,
+          isAbridged: request.isAbridged,
+          hasNotes: request.hasNotes,
+          notes: request.notes,
+          revision: { increment: 1 },
+        },
+      })
+
+      await tx.catalogRevision.create({
+        data: {
+          entityType: 'TRANSLATION',
+          entityId: translationId,
+          actorId: userId,
+          before: toTranslationRevisionSnapshot(before),
+          after: toTranslationRevisionSnapshot(after),
+          fromRevision: before.revision,
+          toRevision: after.revision,
+        },
+      })
+
+      const editionCount = await tx.edition.count({ where: { translationId } })
+
+      return { translation: toTranslation(after, editionCount) }
+    })
+  }
+
+  /**
+   * Stage 8e-2, R8/R9/R10: Edition correction. Same locked-read shape as
+   * {@link patchWork}/{@link patchTranslation} — `before`, the ownership
+   * check, and the `expectedRevision` check share the ONE read taken under
+   * `FOR UPDATE`. `translationId` keeps the same cross-Work rule as
+   * `createEdition` (see the comment there); unique ISBN and merged-Work
+   * semantics are unchanged — a merged Work's Editions moved to the target at
+   * merge time (`MergeService`), so an Edition never actually belongs to a
+   * non-canonical Work here, and holding this row's own lock means a
+   * concurrent merge cannot move it out from under this transaction either.
+   */
+  async patchEdition(
+    userId: string,
+    editionId: string,
+    request: EditionPatchRequest,
+  ): Promise<EditionPatchResponse> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Edition" WHERE "id" = ${editionId} FOR UPDATE`
+
+        const before = await tx.edition.findUnique({
+          where: { id: editionId },
+          include: {
+            work: { select: { id: true, origLang: true } },
+            copies: { where: { ownerId: userId }, select: { id: true } },
+            translation: true,
+          },
+        })
+
+        if (before === null) throw notFound('Видання не знайдено')
+
+        const canEdit = before.createdById === userId || before.copies.length > 0
+
+        if (!canEdit) throw forbidden()
+
+        if (request.translationId !== undefined && request.translationId !== null) {
+          const translation = await tx.translation.findUnique({
+            where: { id: request.translationId },
+            select: { workId: true },
+          })
+
+          if (translation === null || translation.workId !== before.workId) {
+            throw new ApiException(
+              API_ERROR_CODES.VALIDATION_ERROR,
+              'Переклад не належить цьому твору',
+              HttpStatus.BAD_REQUEST,
+            )
+          }
+        }
+
+        if (before.revision !== request.expectedRevision) {
+          throw new ApiException(
+            API_ERROR_CODES.CATALOG_REVISION_CONFLICT,
+            'Видання змінено раніше — оновіть дані й спробуйте ще раз',
+            HttpStatus.CONFLICT,
+            { edition: toEdition(before, before.work) },
+          )
+        }
+
+        const after = await tx.edition.update({
+          where: { id: editionId },
+          data: {
+            translationId: request.translationId,
+            publisher: request.publisher,
+            year: request.year,
+            isbn13: request.isbn13,
+            pageCount: request.pageCount,
+            coverUrl: request.coverUrl,
+            format: request.format,
+            revision: { increment: 1 },
+          },
+          include: { translation: true },
+        })
+
+        await tx.catalogRevision.create({
+          data: {
+            entityType: 'EDITION',
+            entityId: editionId,
+            actorId: userId,
+            before: toEditionRevisionSnapshot(before),
+            after: toEditionRevisionSnapshot(after),
+            fromRevision: before.revision,
+            toRevision: after.revision,
+          },
+        })
+
+        return { edition: toEdition(after, before.work) }
+      })
     } catch (error) {
       if (isUniqueViolation(error) && request.isbn13 !== undefined && request.isbn13 !== null) {
         throw await this.isbnTaken(request.isbn13)
@@ -415,7 +781,7 @@ export class CatalogService {
   }
 
   private async assertAuthorsExist(
-    authors: CreateWorkRequest['authors'],
+    authors: { authorId?: string }[],
     tx: Pick<PrismaService, 'author'>,
   ): Promise<void> {
     const ids = [
@@ -483,6 +849,15 @@ function countEditionsPerTranslation(
 
 function notFound(message: string): ApiException {
   return new ApiException(API_ERROR_CODES.NOT_FOUND, message, HttpStatus.NOT_FOUND)
+}
+
+/** Stage 8e-2, R8: creator or Copy-owner only — see `API_ERROR_CODES.CATALOG_EDIT_FORBIDDEN`. */
+function forbidden(): ApiException {
+  return new ApiException(
+    API_ERROR_CODES.CATALOG_EDIT_FORBIDDEN,
+    'Ви не можете редагувати цей запис каталогу',
+    HttpStatus.FORBIDDEN,
+  )
 }
 
 /**

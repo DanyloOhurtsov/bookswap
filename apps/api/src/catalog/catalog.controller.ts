@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -15,10 +16,13 @@ import type {
   ApiError,
   CatalogSearchResponse,
   EditionDetailResponse,
+  EditionPatchResponse,
   EditionResponse,
   TranslationListResponse,
+  TranslationPatchResponse,
   TranslationResponse,
   WorkDetailResponse,
+  WorkPatchResponse,
 } from '@bookswap/shared'
 import { CurrentUser } from '../auth/authenticated-request'
 import { SessionGuard } from '../auth/session.guard'
@@ -26,6 +30,7 @@ import { CATALOG_WRITE_RATE_LIMIT, CATALOG_WRITE_RATE_WINDOW_MS } from '../commo
 import { CanonicalWorkService } from './canonical/canonical-work.service'
 import { redirectToCanonicalWork } from './canonical/work-redirect'
 import { CatalogService } from './catalog.service'
+import { PatchEditionDto, PatchTranslationDto, PatchWorkDto } from './dto/catalog-correction.dto'
 import {
   CatalogSearchDto,
   CreateEditionDto,
@@ -73,6 +78,7 @@ export class CatalogController {
    */
   @Get('works/:id')
   async getWork(
+    @CurrentUser() user: UserModel,
     @Param('id') id: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<WorkDetailResponse | ApiError> {
@@ -80,7 +86,7 @@ export class CatalogController {
 
     if (resolved.moved) return redirectToCanonicalWork(response, resolved)
 
-    return this.catalog.getWork(resolved.workId)
+    return this.catalog.getWork(user.id, resolved.workId)
   }
 
   @Get('works/:id/translations')
@@ -133,5 +139,39 @@ export class CatalogController {
   @Get('editions/:id')
   getEdition(@Param('id') id: string): Promise<EditionDetailResponse> {
     return this.catalog.getEdition(id)
+  }
+
+  /** Stage 8e-2: R8 permissions, R9 revision conflict + audit, R10a author replacement. */
+  @Patch('works/:id')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(CATALOG_WRITE_LIMIT)
+  patchWork(
+    @CurrentUser() user: UserModel,
+    @Param('id') id: string,
+    @Body() dto: PatchWorkDto,
+  ): Promise<WorkPatchResponse> {
+    return this.catalog.patchWork(user.id, id, dto)
+  }
+
+  @Patch('translations/:id')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(CATALOG_WRITE_LIMIT)
+  patchTranslation(
+    @CurrentUser() user: UserModel,
+    @Param('id') id: string,
+    @Body() dto: PatchTranslationDto,
+  ): Promise<TranslationPatchResponse> {
+    return this.catalog.patchTranslation(user.id, id, dto)
+  }
+
+  @Patch('editions/:id')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(CATALOG_WRITE_LIMIT)
+  patchEdition(
+    @CurrentUser() user: UserModel,
+    @Param('id') id: string,
+    @Body() dto: PatchEditionDto,
+  ): Promise<EditionPatchResponse> {
+    return this.catalog.patchEdition(user.id, id, dto)
   }
 }

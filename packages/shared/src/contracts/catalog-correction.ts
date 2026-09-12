@@ -35,16 +35,46 @@ export const expectedRevisionSchema = z.number().int().positive()
 // --- Запити --------------------------------------------------------------
 
 /**
+ * PO decision (Stage 8e-2, R10a — replaces the open choice `workAuthorInputObjectSchema`
+ * used to leave to this write path): `authorId` (an existing author) and
+ * `nameLatin` are mutually exclusive on one element, REJECTED with 400 — even
+ * when `nameLatin` is explicitly `null`. `nameLatin` only means anything
+ * paired with a NEW author's `name`; combined with `authorId` it would look
+ * like a channel to edit that shared `Author` row's transliteration, which
+ * R10 forbids. Rejecting (rather than silently dropping `nameLatin`) keeps
+ * this consistent with every other "unknown/contradictory input" rule in this
+ * PATCH — see the top-level `.strict()` and the client-supplied `position`
+ * rejection below: this project never silently strips a field the client
+ * explicitly sent.
+ *
+ * `authorId !== undefined` alone does not trigger this — only when `nameLatin`
+ * is ALSO present as a key (string or `null`); a plain `{ authorId }` element
+ * is unaffected.
+ */
+export const AUTHOR_ID_EXCLUDES_NAME_LATIN_MESSAGE =
+  'nameLatin не редагує транслітерацію наявного автора — вкажіть його лише для нового автора (без authorId)'
+
+export function authorIdExcludesNameLatin(value: {
+  authorId?: string
+  nameLatin?: string | null
+}): boolean {
+  return value.authorId === undefined || value.nameLatin === undefined
+}
+
+/**
  * Nested author input for PATCH — same fields as `workAuthorInputObjectSchema`
  * (create), but `.strict()`: unknown keys (notably a client-supplied
  * `position`, which R10a reserves for the server) are rejected, not silently
  * stripped. This is a PATCH-only tightening built off the shared object shape;
  * `workAuthorInputSchema` itself (create's schema) is untouched, so create's
- * existing strip-unknown-keys behavior does not change.
+ * existing strip-unknown-keys behavior does not change — the `authorId`/
+ * `nameLatin` exclusion above is PATCH-only for the same reason: create has no
+ * existing author whose transliteration this ambiguity could be mistaken for.
  */
 const strictWorkAuthorInputSchema = workAuthorInputObjectSchema
   .strict()
   .refine(authorHasOneSource, AUTHOR_HAS_ONE_SOURCE_MESSAGE)
+  .refine(authorIdExcludesNameLatin, AUTHOR_ID_EXCLUDES_NAME_LATIN_MESSAGE)
 
 /**
  * `authors` — exactly what 8e-1 agreed on: omitted (undefined) means no
