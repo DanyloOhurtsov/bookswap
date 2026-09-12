@@ -1,3 +1,29 @@
+/**
+ * `migration-scratch.ts` imports `./test-database` for its URL/name helpers,
+ * and the REAL `test-database.ts` reads `.env` and requires `TEST_DATABASE_URL`
+ * at the module level (`assertSafeTestDatabase(process.env)`), because that
+ * module also backs the live-Postgres `*.db-spec.ts` suite where that's
+ * correct. This file is a `*.spec.ts` unit test — it runs under `pnpm test`
+ * (turbo's `test` task, no DB env vars forwarded — only `test:db` gets those,
+ * see `turbo.json`) — so pulling in the real module would fail with a missing
+ * `TEST_DATABASE_URL` before a single test body runs, regardless of what the
+ * test itself checks.
+ *
+ * The mock below replaces the whole module with synthetic, mutually
+ * consistent local URLs — no `jest.requireActual`, so the real module (its
+ * `.env` load and its `TEST_DATABASE_URL` requirement) never executes, and no
+ * network I/O ever happens. `./guard` is deliberately NOT mocked: the safety
+ * check that turns these URLs into a validated `DatabaseTarget` stays real,
+ * the same way `guard.spec.ts` exercises it directly with fake URLs.
+ */
+jest.mock('./test-database', () => ({
+  maintenanceUrl: () => 'postgresql://test:test@localhost:5432/postgres',
+  originalDatabaseUrl: () => 'postgresql://test:test@localhost:5432/bookswap',
+  originalDirectDatabaseUrl: () => 'postgresql://test:test@localhost:5432/bookswap',
+  testDatabaseName: () => 'bookswap_test',
+  testDatabaseUrl: () => 'postgresql://test:test@localhost:5432/bookswap_test',
+}))
+
 import {
   createScratchDatabaseUsing,
   scratchDatabaseName,
@@ -61,14 +87,22 @@ describe('createScratchDatabaseUsing', () => {
   it('a failed CREATE returns no handle — there is nothing to call cleanup() on', async () => {
     const executor = new RecordingExecutor(/^CREATE DATABASE/)
     let handle: Awaited<ReturnType<typeof createScratchDatabaseUsing>> | undefined
+    let caught: unknown
 
     try {
       handle = await createScratchDatabaseUsing(executor, 'lifecycle')
-    } catch {
-      // expected — handle stays undefined
+    } catch (error) {
+      caught = error
     }
 
     expect(handle).toBeUndefined()
+    // An empty catch would also let this pass on an unrelated failure (e.g.
+    // missing test-database config) that never reaches CREATE at all — assert
+    // CREATE was actually issued and rejected with the expected error, not
+    // just "something threw".
+    expect(caught).toBeInstanceOf(Error)
+    expect((caught as Error).message).toMatch(/Failed to create scratch database/)
+    expect(createCalls(executor)).toHaveLength(1)
     // Nothing reachable could have called cleanup(), so nothing dropped —
     // this is the same invariant as the previous test, from the caller's
     // side rather than the executor's.
